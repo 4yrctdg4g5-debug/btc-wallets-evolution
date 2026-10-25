@@ -1,0 +1,52 @@
+/* ── Spacing, radius, elevation, motion tokens ──────────────────────────
+   4px base. Soft, coherent radii. Subtle elevation (no brutalist offset
+   shadows). Three motion durations.
+   ───────────────────────────────────────────────────────────────────── */
+:root {
+  /* Spacing — 4px base */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* Radius — soft, consistent scale */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   10px; /* default card / input radius */
+  --radius-lg:   14px;
+  --radius-xl:   20px;
+  --radius-full: 999px;
+
+  /* Elevation — subtle. Dark theme leans on surface contrast, not shadow. */
+  --shadow-none: none;
+  --shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.36);
+  --shadow-lg:   0 16px 48px rgba(0, 0, 0, 0.46);
+
+  /* Motion */
+  --motion-fast: 120ms; /* @kind other */
+  --motion-base: 220ms; /* @kind other */
+  --motion-slow: 360ms; /* @kind other */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1); /* @kind other */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+
+  /* Real vs simulation: border style is the discriminator.
+     Solid = live/real, dashed = simulation/scenario. */
+  --stroke-real: solid;
+  --stroke-sim:  dashed;
+  --border-width: 1px;
+}
+
+[data-theme="light"] {
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.10);
+  --shadow-lg: 0 16px 48px rgba(16, 24, 40, 0.16);
+}

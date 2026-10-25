@@ -1,0 +1,48 @@
+/* ── Typography tokens ──────────────────────────────────────────────────
+   One sans-serif family for everything (Geist). No mono, no uppercase
+   eyebrows. Small labels are sentence case. Numbers use tabular figures
+   so columns align.
+   ───────────────────────────────────────────────────────────────────── */
+:root {
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Same family — numeric contexts switch on tabular + slashed-zero via
+     --num-features below, NOT a different font. */
+  --font-numeric: var(--font-sans);
+
+  /* Enable tabular, lining figures + slashed zero for all numbers. */
+  --num-features: "tnum" 1, "lnum" 1, "zero" 1, "cv01" 1; /* @kind other */
+
+  /* Type scale (px). Rehaussée pour la lisibilité (base 16px, bas de
+     l'échelle relevé) — la hiérarchie reste préservée. */
+  --text-2xs:  13px; /* dot labels, axis ticks — use sparingly */
+  --text-xs:   14px; /* meta, captions */
+  --text-sm:   15px; /* secondary labels, table cells */
+  --text-base: 16px; /* body default */
+  --text-md:   17px; /* emphasised body */
+  --text-lg:   20px; /* card titles */
+  --text-xl:   25px; /* section headings */
+  --text-2xl:  31px; /* KPI numbers */
+  --text-3xl:  40px; /* hero KPI / total value */
+  --text-4xl:  53px;
+
+  /* Weights — only 4 in use */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* Line heights */
+  --leading-tight:  1.15;
+  --leading-snug:   1.3;
+  --leading-normal: 1.5;
+
+  /* Letter spacing — near zero. No wide tracking anywhere. */
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+
+  /* Label (replaces the old mono-uppercase eyebrow) */
+  --label-size:    var(--text-xs);
+  --label-weight:  var(--weight-medium);
+  --label-color:   var(--text-secondary);
+  --label-tracking: var(--tracking-normal);
+}

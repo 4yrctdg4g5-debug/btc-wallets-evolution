@@ -1,0 +1,125 @@
+/* ── Color tokens ───────────────────────────────────────────────────────
+   Functional dark-first minimalism. Accent MONOCHROME (blanc en sombre,
+   noir en clair — ex-orange BTC) ; les couleurs fortes restent réservées
+   au sens (gain/perte). Dark is the default (:root); light overrides under
+   [data-theme="light"]. Consumers read the SEMANTIC aliases, not the raw
+   ramp values.
+   ───────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  /* Raw ramp — neutral surfaces (bg-0 → bg-4) */
+  --c-canvas:        #0E1116; /* bg-0 — app background            */
+  --c-surface:       #161A20; /* bg-1 — cards, panels             */
+  --c-surface-2:     #1C212A; /* bg-2 — elevated / hover surface  */
+  --c-surface-3:     #232934; /* bg-3 — active / pressed surface  */
+  --c-border:        #262C36; /* bg-4 line — hairline             */
+  --c-border-strong: #323A47; /* line-strong — marked separator   */
+
+  /* Raw text ramp (3 levels only) */
+  --c-text-0: #E6EAF0; /* primary  */
+  --c-text-1: #9AA4B2; /* secondary */
+  --c-text-2: #5C6675; /* muted     */
+
+  /* Accent — monochrome neutre (ex-orange BTC). Actions, actif, focus. */
+  --c-accent:      #E6EAF0;   /* = --c-text-0 */
+  --c-accent-hover:#FFFFFF;
+  --c-accent-press:#C9D0DA;
+  /* Tint of accent for soft fills (focus rings, selected rows) */
+  --c-accent-soft: rgba(230, 234, 240, 0.10);
+  --c-accent-ring: rgba(230, 234, 240, 0.35);
+  --c-accent-contrast: #14171C;   /* texte/pouce posé SUR un fond accent */
+
+  /* Semantic trading colors */
+  --c-gain:      #22C55E;
+  --c-gain-soft: rgba(34, 197, 94, 0.14);
+  --c-loss:      #EF4444;
+  --c-loss-soft: rgba(239, 68, 68, 0.14);
+  /* Alerte intermédiaire (levier 11-20×…) — l'orange, désormais réservé au sens */
+  --c-warn:      #F7931A;
+  --c-warn-soft: rgba(247, 147, 26, 0.14);
+
+  /* Account / wallet identity palette — cool, used in touches only.
+     Never as a background fill. Same color reused for a wallet across
+     its card / dot / chart series. */
+  --c-id-blue:    #4F8DFF;
+  --c-id-cyan:    #22D3EE;
+  --c-id-violet:  #8B5CF6;
+  --c-id-fuchsia: #D946EF;
+  --c-id-magenta: #EC4899;
+  --c-id-slate:   #64748B;
+
+  /* Overlay (modal scrim) */
+  --c-scrim: rgba(8, 10, 14, 0.66);
+
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --c-canvas:        #F6F7F9;
+  --c-surface:       #FFFFFF;
+  --c-surface-2:     #FFFFFF;
+  --c-surface-3:     #EEF1F5;
+  --c-border:        #E3E7ED;
+  --c-border-strong: #CDD4DE;
+
+  --c-text-0: #161A20;
+  --c-text-1: #5C6675;
+  --c-text-2: #9AA4B2;
+
+  --c-accent:      #161A20; /* = --c-text-0 light */
+  --c-accent-hover:#000000;
+  --c-accent-press:#3A4250;
+  --c-accent-soft: rgba(22, 26, 32, 0.08);
+  --c-accent-ring: rgba(22, 26, 32, 0.30);
+  --c-accent-contrast: #FFFFFF;
+
+  --c-gain:      #16A34A;
+  --c-gain-soft: rgba(22, 163, 74, 0.12);
+  --c-warn:      #E07E08; /* assombri pour contraste AA sur blanc */
+  --c-warn-soft: rgba(247, 147, 26, 0.12);
+  --c-loss:      #DC2626;
+  --c-loss-soft: rgba(220, 38, 38, 0.12);
+
+  --c-id-blue:    #2F6FE0;
+  --c-id-cyan:    #0E9CB8;
+  --c-id-violet:  #7C4DF0;
+  --c-id-fuchsia: #C026D3;
+  --c-id-magenta: #DB2777;
+  --c-id-slate:   #5A6678;
+
+  --c-scrim: rgba(20, 24, 30, 0.32);
+
+  color-scheme: light;
+}
+
+/* ── Semantic aliases (use THESE in components) ──────────────────────── */
+:root {
+  --surface-canvas:    var(--c-canvas);
+  --surface-card:      var(--c-surface);
+  --surface-elevated:  var(--c-surface-2);
+  --surface-active:    var(--c-surface-3);
+
+  --hairline:          var(--c-border);
+  --hairline-strong:   var(--c-border-strong);
+
+  --text-primary:      var(--c-text-0);
+  --text-secondary:    var(--c-text-1);
+  --text-muted:        var(--c-text-2);
+
+  --accent:            var(--c-accent);
+  --accent-hover:      var(--c-accent-hover);
+  --accent-press:      var(--c-accent-press);
+  --accent-soft:       var(--c-accent-soft);
+  --accent-contrast:   var(--c-accent-contrast);
+  --focus-ring:        var(--c-accent-ring);
+
+  --gain:              var(--c-gain);
+  --gain-soft:         var(--c-gain-soft);
+  --loss:              var(--c-loss);
+  --loss-soft:         var(--c-loss-soft);
+  --warn:              var(--c-warn);
+  --warn-soft:         var(--c-warn-soft);
+
+  --scrim:             var(--c-scrim);
+}

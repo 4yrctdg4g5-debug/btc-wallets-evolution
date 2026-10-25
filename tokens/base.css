@@ -1,0 +1,39 @@
+/* ── Base / reset ───────────────────────────────────────────────────────
+   Minimal element defaults so specimen cards and components inherit the
+   system without per-file boilerplate. Numbers get tabular figures here.
+   ───────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* All numeric output should align in columns. Apply .num (or rely on the
+   MoneyValue / metric components which set this). */
+.num,
+[data-numeric] {
+  font-variant-numeric: tabular-nums lining-nums slashed-zero;
+  font-feature-settings: var(--num-features);
+}
+
+:where(button) { font-family: inherit; }
+
+:where(a) { color: var(--accent); text-decoration: none; }
+
+::selection { background: var(--accent-soft); }
+
+:where(:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
