@@ -2169,11 +2169,15 @@ function ChartCanvas({ series, labels, unit, w, h, hover, setHover, stepMode = f
       const pinch = e.ctrlKey && e.deltaMode === 0 && Math.abs(e.deltaY) < 50;
       zoomAt(e.clientX, Math.min(1.4, Math.max(0.7, Math.pow(pinch ? 1.01 : 1.001, e.deltaY))));
     };
-    // Safari : pincement = GestureEvent (scale cumulé depuis gesturestart).
+    // Safari : pincement = GestureEvent (scale cumulé depuis gesturestart). Sur écran
+    // tactile (iPhone/iPad), pas de zoom au doigt : le pincement est seulement neutralisé
+    // sur le graphe (sinon c'est la page entière qui zoome) — les boutons de période suffisent.
+    const touchScreen = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     let lastScale = 1;
     const onGestureStart = (e) => { e.preventDefault(); gesturing = true; lastScale = 1; };
     const onGestureChange = (e) => {
       e.preventDefault();
+      if (touchScreen) return;
       const k = lastScale / (e.scale || 1);
       lastScale = e.scale || 1;
       zoomAt(e.clientX, Math.min(1.4, Math.max(0.7, k)));
@@ -2191,8 +2195,15 @@ function ChartCanvas({ series, labels, unit, w, h, hover, setHover, stepMode = f
     };
   }, [zoomable]);
 
+  // Événements POINTEUR (souris et doigt, même code). Au doigt : le curseur et l'infobulle
+  // suivent le doigt tant qu'il est posé et disparaissent au relâchement (onUp) ; pas de
+  // zoom ni de pan tactiles, les boutons de période suffisent. touch-action: pan-y (style
+  // du svg) laisse le défilement vertical au navigateur — il émet alors pointercancel,
+  // qui efface aussi l'infobulle.
   const endDrag = () => { dragRef.current = null; setDragging(false); };
+  const onUp = (e) => (e.pointerType === 'touch' ? onLeave() : endDrag());
   const onDown = (e) => {
+    if (e.pointerType === 'touch') { onMove(e); return; }   // infobulle dès le contact
     if (!zoomable || !win) return;                     // pan seulement quand zoomé
     e.preventDefault();
     dragRef.current = { x0: e.clientX, a, b };
@@ -2225,9 +2236,9 @@ function ChartCanvas({ series, labels, unit, w, h, hover, setHover, stepMode = f
   const onLeave = () => { setHover(null); if (setHoverX) setHoverX(null); endDrag(); };
 
   return (
-    <svg ref={svgRef} width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}
+    <svg ref={svgRef} width="100%" height="100%" style={{ display: 'block', overflow: 'visible', touchAction: 'pan-y' }}
       className={zoomable ? 'zoomable' + (win ? ' zoomed' : '') + (dragging ? ' grabbing' : '') : ''}
-      onMouseMove={onMove} onMouseLeave={onLeave} onMouseDown={onDown} onMouseUp={endDrag}
+      onPointerMove={onMove} onPointerLeave={onLeave} onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onLeave}
       onDoubleClick={() => zoomable && setWin(null)}>
       {win && <defs><clipPath id={clipId}><rect x={padLeft} y={padTop - 8} width={iw} height={ih + 16} /></clipPath></defs>}
       {/* Filigranes de trades : bandes translucides sur la durée de chaque épisode (arrière-plan) */}
@@ -2321,7 +2332,7 @@ function ChartCanvas({ series, labels, unit, w, h, hover, setHover, stepMode = f
         return (
           <g key={'mk' + i} style={clickable ? { cursor: 'pointer' } : undefined}
             onClick={clickable ? (e) => { e.stopPropagation(); onMarkerClick(mk); } : undefined}
-            onMouseDown={clickable ? (e) => e.stopPropagation() : undefined}
+            onPointerDown={clickable ? (e) => e.stopPropagation() : undefined}
             onDoubleClick={clickable ? (e) => e.stopPropagation() : undefined}>
             <circle cx={x} cy={y} r="3.2" fill="var(--surface-card)" stroke={fg} strokeWidth="2" />
             <rect x={px} y={py} width={wlab} height="18" rx="9" fill={bg} />
@@ -2331,7 +2342,7 @@ function ChartCanvas({ series, labels, unit, w, h, hover, setHover, stepMode = f
       })}
       {/* Badge de réinitialisation du zoom (aussi : double-clic) */}
       {zoomable && win && (
-        <g style={{ cursor: 'pointer' }} onClick={() => setWin(null)} onMouseDown={e => e.stopPropagation()}>
+        <g style={{ cursor: 'pointer' }} onClick={() => setWin(null)} onPointerDown={e => e.stopPropagation()}>
           <rect x={padLeft + 4} y={padTop + 2} width="26" height="20" rx="10" fill="var(--surface-active)" stroke="var(--hairline)" />
           <text x={padLeft + 17} y={padTop + 16} textAnchor="middle" fontSize="12" fill="var(--text-secondary)">⟲</text>
         </g>
@@ -2784,23 +2795,32 @@ function EditPositionForm({ pos, onSave, onCancel, pctMode = false, capitalBasis
 /* `levTitle`/`allocTitle` : infobulles optionnelles. Un trade HL clos ne connaît souvent
    ni son levier ni sa marge d'alors — les valeurs affichées sont alors reconstituées, et
    la ligne doit pouvoir le dire sans changer de gabarit. */
+// Texte d'une ligne de position découpé aux séparateurs « · » et « @ » : sur écran étroit
+// la ligne passe à la ligne ENTRE deux segments, jamais au milieu d'un montant (« SL /
+// 78,000 »). Les lignes non textuelles (fragments JSX) passent telles quelles.
+function lineSegs(line) {
+  if (typeof line !== 'string') return line;
+  return line.split(/( · | @ )/).map((s, i) => (i % 2 ? s : <span key={i} className="seg">{s}</span>));
+}
+
+// Gabarit en classes (app.css .posrow*) : sur téléphone, la grille passe à deux rangées.
 function PosRow({ side, leverage, alloc, allocColor, line1, line2, line3, center, right, levTitle, allocTitle }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: center != null ? 'auto 1fr auto auto' : 'auto 1fr auto', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-2)', borderBottom: '1px solid var(--hairline)' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'stretch' }}>
+    <div className={'posrow' + (center != null ? ' has-center' : '')}>
+      <div className="posrow-side">
         <Badge tone={side} size="sm" style={{ justifyContent: 'center' }}>{side === 'long' ? 'Long' : 'Short'}</Badge>
         {leverage != null && <LeverageBadge value={leverage} size="sm" color={idVar(allocColor)} title={levTitle} style={{ justifyContent: 'center' }} />}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      <div className="posrow-main">
         {alloc != null && <span className="posrow-ring" title={allocTitle}><AllocationRing percent={alloc} color={dsColor(allocColor)} size="md" /></span>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--text-primary)' }}>{line1}</span>
-          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)' }}>{line2}</span>
-          {line3 && <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)' }}>{line3}</span>}
+        <div className="posrow-text">
+          <span className="posrow-l1">{lineSegs(line1)}</span>
+          <span className="posrow-l2">{lineSegs(line2)}</span>
+          {line3 && <span className="posrow-l2">{lineSegs(line3)}</span>}
         </div>
       </div>
-      {center != null && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{center}</div>}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{right}</div>
+      {center != null && <div className="posrow-center">{center}</div>}
+      <div className="posrow-right">{right}</div>
     </div>
   );
 }
@@ -2817,14 +2837,14 @@ function OpenPosRow({ side, leverage, alloc, color, line1, line2,
   return (
     <div className="oprow">
       <div className="oprow-config">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'stretch' }}>
+        <div className="posrow-side">
           <Badge tone={side} size="sm" style={{ justifyContent: 'center' }}>{side === 'long' ? 'Long' : 'Short'}</Badge>
           {leverage != null && <LeverageBadge value={leverage} size="sm" color={idVar(color)} style={{ justifyContent: 'center' }} />}
         </div>
         {alloc != null && <span className="posrow-ring"><AllocationRing percent={alloc} color={dsColor(color)} size="md" /></span>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--text-primary)' }}>{line1}</span>
-          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)' }}>{line2}</span>
+        <div className="posrow-text">
+          <span className="posrow-l1">{lineSegs(line1)}</span>
+          <span className="posrow-l2">{lineSegs(line2)}</span>
         </div>
       </div>
       <div className="divider" />
@@ -3835,9 +3855,11 @@ function HlClosedTradeRow({ rec, num, color, note, journalPending, onSaveNote, o
           line1={`${ref && ref.margin != null ? numFmt(ref.margin) + ' USDC' : numFmt(cap.sizeOpened, 4) + ' ' + rec.coin}`
             + ` · ${hlPx(cap.avgEntry)} → ${x.avgExit != null ? hlPx(x.avgExit) : '—'}`}
           line2={<>
-            {num != null && <span className="num" title="Numéro du trade sur le graphe du portefeuille">{tag} · </span>}
-            {new Date(rec.t1).toLocaleDateString('fr-FR')} · {rec.coin} · {fmtDur(rec.t0, rec.t1)}
-            {x.fees != null ? ' · frais ' + numFmt(x.fees) : ''}
+            {/* Segments insécables (.seg), comme lineSegs : coupure entre segments seulement. */}
+            {num != null && <><span className="num seg" title="Numéro du trade sur le graphe du portefeuille">{tag}</span>{' · '}</>}
+            <span className="seg">{new Date(rec.t1).toLocaleDateString('fr-FR')}</span>{' · '}
+            <span className="seg">{rec.coin}</span>{' · '}<span className="seg">{fmtDur(rec.t0, rec.t1)}</span>
+            {x.fees != null && <>{' · '}<span className="seg">{'frais ' + numFmt(x.fees)}</span></>}
           </>}
           center={badge ? <Badge tone={badge[1]} size="sm">{badge[0]}</Badge> : null}
           right={<>

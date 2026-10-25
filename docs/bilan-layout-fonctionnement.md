@@ -452,6 +452,21 @@ interrupteur « Thème sombre » coché en thème clair · marqueur d'entrée d'
 avant la plage collé au bord gauche · clôture manuelle étiquetée « TP » si gagnante et
 « SL » si perdante (→ TP/SL seulement si la cible ou le stop est touché, sinon montant seul).
 
+**Rendu téléphone revu le 2026-10-25** (≤640px, bloc « Responsive » d'app.css) : échelle
+typographique resserrée (tokens `--text-*` −1 à −8px, tout le DS suit), champs à 16px
+(pas de zoom iOS), marges des cartes réduites, bandeau `.modal-stats` en grille 2 colonnes
+(séparateurs → filets horizontaux, « Valeur » pleine largeur dans les panneaux de compte),
+`.oprow` en grille 5 colonnes (config / Valeur · Latent ⎮ Si TP · Si SL / actions),
+`PosRow` passé en classes `.posrow*` → 2 rangées sur téléphone (texte ⎮ [Rekt / ordre
+sim] + résultat + icônes), segments insécables `.seg` (`lineSegs`) pour ne couper qu'entre
+deux montants, barre de défilement parasite des onglets supprimée. Desktop inchangé.
+Graphes au doigt : `ChartCanvas` passe aux événements **pointeur** (souris et doigt, même
+code) avec `touch-action: pan-y` — 1 doigt = curseur + infobulle qui suivent le doigt et
+disparaissent au relâchement (`onUp`) ou quand le navigateur reprend le défilement vertical
+(`pointercancel`) ; tap sur un repère = ligne du trade. **Pas de zoom ni de pan tactiles**
+(choix utilisateur : les boutons de période suffisent) — le pincement est neutralisé sur le
+graphe (`pointer: coarse`) pour ne pas zoomer la page.
+
 **Restent exacts :**
 - `data-theme="dark"` est en dur dans le HTML → possible flash sombre au premier rendu
   si le thème stocké est clair.

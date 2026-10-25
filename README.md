@@ -30,7 +30,7 @@ Design system « functional dark minimalism » (dossier `BTC Wallets Design Syst
 
 **Simulation** — onglets indépendants de scénarios chaînés : marge en **% du capital disponible avant la position** (le résultat d'une position dimensionne la suivante), issue @TP/@SL choisie par position, bornes Tout TP / Tout SL, trajectoire par étapes, « Copier depuis le Live » (conversion chaînée fidèle).
 
-**Transverse** — **T0** par portefeuille (re-base les flux à une date choisie, stocks intacts), **zoom** des graphes temps réel (⌘/Ctrl + molette ou pincement du trackpad = zoom — la molette seule fait défiler la page —, glisser = pan, double-clic = reset), **graphes en %** = gains cumulés ÷ capital déposé du jour (les dépôts ne comptent pas comme des gains ; le cash n'a pas d'équivalent en %), **export Pine Script v6** (TradingView, trades BTC, par compte ou global), export/import JSON, thème sombre/clair.
+**Transverse** — **T0** par portefeuille (re-base les flux à une date choisie, stocks intacts), **zoom** des graphes temps réel (⌘/Ctrl + molette ou pincement du trackpad = zoom — la molette seule fait défiler la page —, glisser = pan, double-clic = reset ; au doigt : curseur qui suit le doigt, pas de zoom tactile — boutons de période), **graphes en %** = gains cumulés ÷ capital déposé du jour (les dépôts ne comptent pas comme des gains ; le cash n'a pas d'équivalent en %), **export Pine Script v6** (TradingView, trades BTC, par compte ou global), export/import JSON, thème sombre/clair.
 
 ## Formules comptables de base
 

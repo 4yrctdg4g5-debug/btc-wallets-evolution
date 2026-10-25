@@ -89,7 +89,7 @@
 .viewnav {
   display: flex; align-items: center; gap: var(--space-1);
   border-bottom: 1px solid var(--hairline);
-  overflow-x: auto; flex: 1; min-width: 0;
+  overflow-x: auto; overflow-y: hidden; flex: 1; min-width: 0;
 }
 .viewnav-tail {
   position: relative; display: flex; align-items: center; gap: var(--space-2);
@@ -155,7 +155,10 @@
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .panel-controls { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; margin-left: auto; }
 .chart-body { position: relative; width: 100%; height: 320px; }
-/* Zoom des graphes : molette = zoom, glisser = pan (quand zoomé), double-clic = reset */
+/* Zoom des graphes : ⌘/Ctrl + molette ou pincement du trackpad = zoom, glisser = pan (quand
+   zoomé), double-clic = reset. Au doigt : curseur qui suit le doigt seulement (touch-action
+   pan-y posé sur le svg) ; user-select évite de sélectionner les libellés en glissant. */
+.chart-body svg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .chart-body svg.zoomable.zoomed { cursor: grab; }
 .chart-body svg.zoomable.grabbing { cursor: grabbing; }
 .chart-empty {
@@ -335,6 +338,7 @@
   display: flex; align-items: center; gap: var(--space-1);
   border-bottom: 1px solid var(--hairline);
   margin-bottom: var(--space-5); overflow-x: auto;
+  overflow-y: hidden;   /* le margin-bottom:-1px des onglets faisait apparaître une barre verticale */
 }
 .accttabs button {
   appearance: none; background: transparent; border: none;
@@ -380,6 +384,21 @@
 /* Anneau d'exposition des lignes de position — agrandi à la hauteur de la pile side+levier */
 .posrow-ring { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
 .posrow-ring > span { transform: scale(1.16); }
+
+/* Ligne de position (clôturées, simulations, trades HL clos) : sens+levier ⎮ anneau +
+   texte ⎮ [centre] ⎮ droite. Les blocs .posrow-side/-text/-l1/-l2 servent aussi à la
+   colonne config des lignes ouvertes (.oprow-config). */
+.posrow { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--hairline); }
+.posrow.has-center { grid-template-columns: auto 1fr auto auto; }
+.posrow-side { display: flex; flex-direction: column; gap: 3px; align-items: stretch; flex: none; }
+.posrow-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.posrow-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.posrow-l1 { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-primary); }
+.posrow-l2 { font-size: var(--text-2xs); color: var(--text-muted); }
+.posrow-center { display: flex; align-items: center; justify-content: center; }
+.posrow-right { display: flex; align-items: center; gap: 6px; }
+/* Segment insécable d'une ligne de position (lineSegs) : coupure entre segments seulement */
+.seg { white-space: nowrap; }
 
 /* Ligne de position OUVERTE en trois sections : config ⎮ courant ⎮ projection.
    flex-wrap : sur écran étroit les sections passent à la ligne au lieu de déborder.
@@ -500,12 +519,59 @@
 
 /* ── Responsive ──────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
+  /* Échelle typographique resserrée : les tokens ont été relevés pour la lecture sur
+     grand écran ; sur téléphone ils faisaient passer montants et libellés à la ligne.
+     Tout le DS suit (MoneyValue, badges…) puisqu'il lit ces variables. */
+  :root {
+    --text-2xs: 12px; --text-xs: 13px; --text-sm: 14px; --text-base: 15px; --text-md: 16px;
+    --text-lg: 18px; --text-xl: 22px; --text-2xl: 26px; --text-3xl: 32px;
+  }
+  /* Safari iOS zoome la page sur un champ < 16px : les champs gardent 16px
+     (!important : les composants du DS posent leur taille en style inline). */
+  input, select, textarea { font-size: 16px !important; }
+
   .wrap { padding: var(--space-4) var(--space-4) var(--space-12); }
   .grid2, .grid3, .margin-pct { grid-template-columns: 1fr; }
   .brand-name { font-size: var(--text-md); }
   .btc-pill .time { display: none; }
   .jrn-bar-row { grid-template-columns: 1fr auto; }
   .jrn-bar { display: none; }
+
+  /* Marges imbriquées réduites (wrap + carte + ligne laissaient ~290px utiles) */
+  .account-panel, .panel, .kpi-col { padding: var(--space-4) var(--space-3); }
+  .account-menu { top: var(--space-3); right: var(--space-2); }
+  .accttabs, .viewnav { scrollbar-width: none; }
+  .accttabs::-webkit-scrollbar, .viewnav::-webkit-scrollbar { display: none; }
+
+  /* Bandeau de stats : grille 2 colonnes alignées (en flex-wrap, les valeurs tombaient
+     à des hauteurs différentes et les séparateurs verticaux restaient orphelins).
+     Les séparateurs deviennent des filets horizontaux pleine largeur. */
+  .modal-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); align-items: start; padding-bottom: 0; }
+  .modal-stats > .divider { grid-column: 1 / -1; width: auto; height: 1px; }
+  /* Panneau de compte : « Valeur » en tête sur toute la largeur, à l'écart du kebab ⋯ */
+  .account-panel > .modal-stats > .modal-stat:first-child { grid-column: 1 / -1; padding-right: 40px; }
+
+  /* Ligne de position OUVERTE : config (pleine largeur) / Valeur · Latent ⎮ Si TP · Si SL
+     sur une rangée / actions à droite. Grille à 5 colonnes : les .oprow-stats s'effacent
+     (display: contents) pour que leurs stats deviennent des cellules ; le séparateur
+     entre config et stats disparaît, celui entre courant et projection reste. */
+  .oprow { display: grid; grid-template-columns: auto auto 1px auto auto; justify-content: space-between;
+           align-items: end; gap: var(--space-3) var(--space-2); padding: var(--space-3) 0; }
+  .oprow-config { grid-column: 1 / -1; min-width: 0; }
+  .oprow-config + .divider { display: none; }
+  .oprow-stats { display: contents; }
+  .oprow > .divider { align-self: stretch; }
+  .oprow-actions { grid-column: 1 / -1; margin-left: 0; justify-content: flex-end; }
+
+  /* Ligne de position (historique, sims, HL clos) : rangée 1 = sens+levier ⎮ anneau +
+     texte ; rangée 2 = [centre : Rekt / ordre sim] ⎮ résultat à gauche, icônes à droite.
+     Avant, la colonne texte tombait à ~30px et chaque mot passait à la ligne. */
+  .posrow, .posrow.has-center { grid-template-columns: auto minmax(0, 1fr); row-gap: var(--space-2); padding: var(--space-3) 0; }
+  .posrow-center { grid-column: 1; grid-row: 2; }
+  .posrow-right { grid-column: 2; grid-row: 2; flex-wrap: wrap; }
+  .posrow-right > :first-child { margin-right: auto; }
+  .pos-note { padding: 0 0 var(--space-3); }
+  .mv-row, .strat-row { padding: var(--space-3) 0; }
 }
 /* Très petit écran : monogramme seul */
 @media (max-width: 480px) {
