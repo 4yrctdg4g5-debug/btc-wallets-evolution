@@ -248,7 +248,11 @@ retour sur la page (`visibilitychange`/`pageshow`) ; tout onglet qui reprend le 
 d'un autre onglet. Un document illisible part en **quarantaine**
 (copie `bwe.state.broken.<ts>`, toute écriture bloquée) au lieu d'être écrasé. La part
 **saisie à la main** du journal est doublée sous `bwe.journal.backup.v1` (restauration
-depuis les réglages du journal). Au chargement, `loadState` fusionne avec
+depuis les réglages du journal). **Nouvelle version** (`useUpdateCheck`, hors `file://`) :
+le script Babel en mémoire et `app.css` chargée sont comparés au code servi en `no-store`
+(10 s après l'ouverture, à chaque retour sur la page, toutes les 15 min) → `UpdateBanner`
+« Nouvelle version disponible » + Recharger (`reloadFresh` : caches rafraîchis en
+`cache: 'reload'` puis `location.reload()`). Au chargement, `loadState` fusionne avec
 `defaultState()` et rejoue deux migrations : `migrateSims` (crée `strategies`, assigne
 `order`, convertit l'ancienne marge absolue en `marginPct`) et `migrateSimTabs`
 (rattache les sims orphelines, corrige une vue invalide) ; **l'import JSON rejoue les

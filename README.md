@@ -8,7 +8,7 @@ Design system « functional dark minimalism » (dossier `BTC Wallets Design Syst
 ## Lancer
 
 - **Double-clic sur `index.html`**, ou via la preview : serveur `bwe2` (`.claude/launch.json`, port 8766).
-- **En ligne** : publiée telle quelle sur **GitHub Pages** (branche `main`, racine du dépôt) — aucun build, chaque push redéploie en ~1 min (le navigateur peut garder l'ancienne version jusqu'à 10 min).
+- **En ligne** : publiée telle quelle sur **GitHub Pages** (branche `main`, racine du dépôt) — aucun build, chaque push redéploie en ~1 min (le navigateur peut garder l'ancienne version jusqu'à 10 min). L'app détecte d'elle-même un nouveau déploiement (code en mémoire vs code servi, 10 s après l'ouverture, à chaque retour et toutes les 15 min) et affiche « Nouvelle version disponible » + **Recharger** — utile depuis l'icône de l'écran d'accueil, sans bouton de rechargement.
 
 ### Version en ligne — à savoir
 

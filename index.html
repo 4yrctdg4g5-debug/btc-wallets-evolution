@@ -1816,6 +1816,62 @@ const Monogram = () => (
   </svg>
 );
 
+/* Nouvelle version déployée ? On compare le code qui TOURNE (script Babel de la page,
+   app.css telle que chargée) à celui que le site sert MAINTENANT (no-store). Aucun
+   numéro de version à tenir à jour : tout déploiement qui touche index.html ou app.css
+   est détecté. Utile surtout depuis l'icône de l'écran d'accueil, sans bouton recharger,
+   où le cache (max-age 600 sur GitHub Pages) garde l'ancienne version. Vérifié 10 s après
+   le chargement, à chaque retour sur l'app et toutes les 15 min ; rien en file:// (local). */
+const BABEL_SRC_RE = /<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/;
+const UPDATE_CHECK_MS = 15 * 60 * 1000;
+const fetchText = async (url, cache) => {
+  const r = await fetch(url, { cache });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.text();
+};
+function useUpdateCheck() {
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    if (location.protocol === 'file:') return;
+    const running = (document.querySelector('script[type="text/babel"]') || {}).textContent || '';
+    // CSS en cours : la copie que le cache HTTP vient de servir à la page (même réponse).
+    let cssBase = null;
+    fetchText('app.css', 'default').then(t => { cssBase = t; }).catch(() => {});
+    let busy = false;
+    const check = async () => {
+      if (busy || document.visibilityState !== 'visible') return;
+      busy = true;
+      try {
+        const m = BABEL_SRC_RE.exec(await fetchText(location.pathname, 'no-store'));
+        const css = cssBase != null ? await fetchText('app.css', 'no-store') : null;
+        if ((m && m[1] !== running) || (css != null && css !== cssBase)) setAvailable(true);
+      } catch (e) { /* hors ligne : on réessaiera au prochain passage */ }
+      busy = false;
+    };
+    const first = setTimeout(check, 10 * 1000);
+    const id = setInterval(check, UPDATE_CHECK_MS);
+    const onVis = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearTimeout(first); clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
+  }, []);
+  return available;
+}
+/* Recharger en contournant le cache HTTP : on rafraîchit d'abord les copies en cache
+   (cache: 'reload'), sinon location.reload() pourrait resservir l'ancienne version. */
+async function reloadFresh() {
+  try { await Promise.all([fetch(location.pathname, { cache: 'reload' }), fetch('app.css', { cache: 'reload' })]); } catch (e) {}
+  location.reload();
+}
+function UpdateBanner() {
+  const [loading, setLoading] = useState(false);
+  return (
+    <div className="update-banner">
+      <span>Nouvelle version disponible.</span>
+      <Button size="sm" variant="primary" loading={loading} onClick={() => { setLoading(true); reloadFresh(); }}>Recharger</Button>
+    </div>
+  );
+}
+
 /* Bandeau d'état de la sauvegarde. Les trois causes sont lues sur des variables
    de module posées par loadState/persist : tout événement qui les change passe
    déjà par un rendu (update() ou le tick du bail), donc aucun abonnement n'est
@@ -5705,6 +5761,7 @@ function App() {
   // Vue simple : choix mémorisé PAR APPAREIL (menu), automatique sur téléphone s'il n'y en
   // a pas. « Vue complète › » et le toucher d'une position ne la quittent que le temps de la
   // session (forceFull, non persisté) : le téléphone rouvre toujours sur l'essentiel.
+  const updateAvailable = useUpdateCheck();
   const [ui, setUi] = useUiPrefs();
   const isPhone = useMedia('(max-width: 640px)');
   const [forceFull, setForceFull] = useState(false);
@@ -6069,6 +6126,7 @@ function App() {
     <div className="app">
       <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={onFile} />
       <div className="wrap">
+        {updateAvailable && <UpdateBanner />}
         <SaveWarning owner={owner} />
         <Header btc={state.btc} priceLoading={loading} priceError={priceError} onRefresh={refreshAll}
           onExport={doExport} onImport={doImport} onReset={doReset}
