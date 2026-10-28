@@ -5623,11 +5623,13 @@ function simplePositions(accounts, price) {
   return rows.sort((x, y) => (x.dist == null) - (y.dist == null) || (x.dist || 0) - (y.dist || 0));
 }
 
-function SimplePosRow({ r, onOpen }) {
+// Ligne passive : toucher une position ne change pas de vue (choix utilisateur — basculer
+// d'un coup en vue complète était trop radical) ; seul « Vue complète › » le fait.
+function SimplePosRow({ r }) {
   const tone = r.dist == null ? null : r.dist <= LIQ_DANGER_PCT ? 'var(--loss)' : r.dist <= LIQ_WARN_PCT ? 'var(--warn)' : null;
   const pct = Math.round(r.pct);                  // signe seulement si l'arrondi n'est pas nul (pas de « −0 % »)
   return (
-    <button className="simple-pos" onClick={onOpen} title={'Ouvrir ' + r.acc.name + ' en vue complète'}>
+    <div className="simple-pos">
       <span className="simple-pos-top">
         <span className="simple-pos-wallet"><ColorDot color={dsColor(r.acc.color)} size={8} /><span className="simple-pos-name">{r.acc.name}</span></span>
         <Badge tone={r.side} size="sm">{r.side === 'long' ? 'L' : 'S'}</Badge>
@@ -5644,7 +5646,7 @@ function SimplePosRow({ r, onOpen }) {
           {r.dist <= 0 ? 'liquidation atteinte' : 'à ' + r.dist.toFixed(r.dist < 10 ? 1 : 0) + ' %'}{tone ? ' ⚠' : ''}
         </span></>}
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -5684,7 +5686,7 @@ function SimpleChart({ history, range, onRange, valTp, valSl }) {
   );
 }
 
-function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onOpenAccount, onFull }) {
+function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onFull }) {
   const now = useNow(5000);
   const fc = useMemo(() => computeForecast(accounts, price), [accounts, price]);
   // Mêmes formules que la colonne KPI (somme exacte des panneaux).
@@ -5745,7 +5747,7 @@ function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRang
       <section className="simple-card">
         <div className="simple-head"><span className="lbl">Positions ouvertes</span><span className="muted">{rows.length}</span></div>
         {rows.length === 0 ? <div className="muted" style={{ padding: 'var(--space-2) 0' }}>Aucune position ouverte.</div>
-          : <div className="simple-pos-list">{rows.map(r => <SimplePosRow key={r.key} r={r} onOpen={() => onOpenAccount(r.acc.id)} />)}</div>}
+          : <div className="simple-pos-list">{rows.map(r => <SimplePosRow key={r.key} r={r} />)}</div>}
       </section>
 
       <button className="simple-switch" onClick={onFull}>Vue complète ›</button>
@@ -5943,12 +5945,6 @@ function App() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [refreshAll]);
-  // Toucher une position en vue simple : son wallet en vue complète, panneau à l'écran.
-  const openAccountFull = (id) => {
-    setForceFull(true);
-    update(s => { s.settings.view = 'live'; s.settings.liveAcct = id; });
-    setTimeout(() => { const el = document.querySelector('.accttabs'); if (el) el.scrollIntoView({ block: 'start' }); }, 60);
-  };
 
   const view = state.settings.view || 'live';
   const createAccount = (d) => {
@@ -6139,7 +6135,7 @@ function App() {
         {simple ? (
           <SimpleView agg={agg} today={today} price={price} btcAt={state.btc.updatedAt} accounts={state.accounts} history={history}
             range={SIMPLE_RANGES.includes(ui.simpleRange) ? ui.simpleRange : '30J'} onRange={(r) => setUi({ simpleRange: r })}
-            onRefresh={refreshAll} refreshing={loading} onOpenAccount={openAccountFull}
+            onRefresh={refreshAll} refreshing={loading}
             onFull={() => { setForceFull(true); window.scrollTo(0, 0); }} />
         ) : (<>
         {simpleWanted && <button className="simple-back" onClick={() => { setForceFull(false); window.scrollTo(0, 0); }}>‹ Vue simple</button>}

@@ -549,11 +549,11 @@
 .chart-body.simple-chart-body { height: 150px; }
 .simple-head { display: flex; align-items: baseline; justify-content: space-between; }
 .simple-pos-list { display: flex; flex-direction: column; }
-/* Ligne de position : bouton plein largeur (toucher = wallet en vue complète) */
+/* Ligne de position : passive (seul « Vue complète › » change de vue) */
 .simple-pos {
-  appearance: none; background: transparent; border: none; border-top: 1px solid var(--hairline);
-  display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left;
-  padding: var(--space-2) 0; cursor: pointer; font-family: var(--font-sans); color: var(--text-primary);
+  border-top: 1px solid var(--hairline);
+  display: flex; flex-direction: column; gap: 3px;
+  padding: var(--space-2) 0; color: var(--text-primary);
 }
 .simple-pos:first-child { border-top: none; padding-top: 0; }
 .simple-pos-top { display: flex; align-items: center; gap: 6px; min-width: 0; }

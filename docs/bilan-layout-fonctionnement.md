@@ -93,8 +93,8 @@
   │ ● Bybit (S)(20×) BTC     +83  +6 % │       distance à la liquidation croissante
   │   Entrée 81,900 · Liq 85,995 · à 5.3 % ⚠ │ ← orange < 10 %, rouge < 5 %
   └────────────────────────────────────┘
-               Vue complète ›                ← forceFull (session) ; toucher une ligne = idem
-                                               + wallet sélectionné ; « ‹ Vue simple » en tête
+               Vue complète ›                ← forceFull (session) — seul moyen de basculer
+                                               (lignes passives) ; « ‹ Vue simple » en tête
 ```
 
 Activation : `ui.simple` (clé `bwe.ui.v1`, par appareil, hors export) sinon automatique
