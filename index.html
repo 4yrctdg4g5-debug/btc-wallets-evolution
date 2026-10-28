@@ -19,7 +19,7 @@
   <div id="root"></div>
 
   <script type="text/babel" data-presets="react">
-const { useState, useEffect, useMemo, useRef, useCallback } = React;
+const { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } = React;
 
 // ── Composants du design system ────────────────────────────────────────
 const DS = window.BTCWalletsDesignSystem_4fe162 || {};
@@ -40,6 +40,8 @@ const JOURNAL_BACKUP_KEY = 'bwe.journal.backup.v1';   // saisies du journal, cl�
 const OWNER_RENEW_MS = 20 * 1000;             // ré-estampillage du bail
 const STALE_MS = 5 * 60 * 1000;
 const AUTO_REFRESH_MS = 60 * 1000;
+const SIMPLE_REFRESH_MS = 20 * 1000;          // vue simple : données plus fraîches (marché agité)
+const UI_KEY = 'bwe.ui.v1';                   // préférences d'affichage PAR APPAREIL, hors document exporté
 // Au-delà, le bail est réputé abandonné : 3 renouvellements manqués (60 s). Une page tuée
 // sans événement (appli fermée depuis le sélecteur du téléphone) bloquait l'onglet suivant
 // 3 min avec l'ancien seuil. Sans risque : persist revérifie le bail à chaque écriture, et
@@ -1673,21 +1675,37 @@ function journalObserveLive(s, accId, snapshot, nowMs) {
 }
 
 /* =============================================================
-   PRIX BTC — CoinGecko (inchangé)
+   PRIX BTC — Hyperliquid (mid), repli CoinGecko
    ============================================================= */
-function useBtcPrice(state, update) {
+/* Cours BTC live : mid Hyperliquid d'abord (temps réel, sans clé, même API que les
+   wallets suivis — CoinGecko peut avoir du retard dans un marché violent), CoinGecko en
+   secours. L'historique (« Reconstruire l'historique ») reste servi par CoinGecko. */
+async function fetchBtcPrice() {
+  try {
+    const mids = await hlFetch({ type: 'allMids' });
+    const p = hlNum(mids && mids.BTC);
+    if (p > 0) return p;
+    throw new Error('BTC absent de allMids');
+  } catch (e) {
+    console.warn('Cours Hyperliquid indisponible, repli CoinGecko :', e);
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const price = d && d.bitcoin && d.bitcoin.usd;
+    if (typeof price !== 'number') throw new Error('Réponse inattendue');
+    return price;
+  }
+}
+
+// intervalMs : cadence du rafraîchissement auto (20 s en vue simple, 60 s sinon).
+function useBtcPrice(state, update, intervalMs = AUTO_REFRESH_MS) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd';
-      const r = await fetch(url);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const d = await r.json();
-      const price = d && d.bitcoin && d.bitcoin.usd;
-      if (typeof price !== 'number') throw new Error('Réponse inattendue');
+      const price = await fetchBtcPrice();
       update(s => {
         s.btc = { price, updatedAt: new Date().toISOString() };
         if (!s.priceHistory) s.priceHistory = {};
@@ -1704,9 +1722,9 @@ function useBtcPrice(state, update) {
   useEffect(() => { refresh(); /* eslint-disable-next-line */ }, []);
   useEffect(() => {
     if (!state.settings.autoRefresh) return;
-    const id = setInterval(refresh, AUTO_REFRESH_MS);
+    const id = setInterval(refresh, intervalMs);
     return () => clearInterval(id);
-  }, [state.settings.autoRefresh, refresh]);
+  }, [state.settings.autoRefresh, refresh, intervalMs]);
 
   return { loading, error, refresh };
 }
@@ -1831,7 +1849,7 @@ function SaveWarning({ owner }) {
 /* =============================================================
    HEADER
    ============================================================= */
-function Header({ btc, priceLoading, priceError, onRefresh, onExport, onImport, onReset, onBackfill, backfilling, theme, onToggleTheme, autoRefresh, onToggleAuto, onPine, onSnotes }) {
+function Header({ btc, priceLoading, priceError, onRefresh, onExport, onImport, onReset, onBackfill, backfilling, theme, onToggleTheme, autoRefresh, onToggleAuto, onPine, onSnotes, simple, onToggleSimple }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef(null);
   useEffect(() => {
@@ -1862,6 +1880,10 @@ function Header({ btc, priceLoading, priceError, onRefresh, onExport, onImport, 
           {open && (
             <div className="menu">
               <div className="menu-label">Affichage</div>
+              <div className="menu-item" style={{ cursor: 'default' }} title="L’essentiel sur une page (mémorisé sur cet appareil)">
+                <span>Vue simple</span>
+                <Switch checked={!!simple} onChange={() => { onToggleSimple(); setOpen(false); }} />
+              </div>
               <div className="menu-item" style={{ cursor: 'default' }}>
                 <span>Thème sombre</span>
                 <Switch checked={theme === 'dark'} onChange={onToggleTheme} />
@@ -2046,8 +2068,13 @@ function SummaryBar({ agg, today, price, accounts = [], state, update }) {
    ============================================================= */
 function useSize(ref) {
   const [size, setSize] = useState({ w: 900, h: 300 });
-  useEffect(() => {
+  // Mesure AVANT la première peinture (useLayoutEffect) : sinon le graphe se dessine une
+  // image à la taille par défaut (900×300) et déborde de son cadre — flagrant sur la vue
+  // simple, dont le graphe ne fait que 150 px de haut.
+  useLayoutEffect(() => {
     if (!ref.current) return;
+    const { clientWidth: w0, clientHeight: h0 } = ref.current;
+    if (w0 && h0) setSize({ w: w0, h: h0 });
     const ro = new ResizeObserver(es => { const e = es[0]; if (e) setSize({ w: e.contentRect.width, h: e.contentRect.height }); });
     ro.observe(ref.current);
     return () => ro.disconnect();
@@ -2259,10 +2286,12 @@ function ChartCanvas({ series, labels, unit, w, h, hover, setHover, stepMode = f
       {yTicks.map((t, i) => {
         const y = yAt(t.v);
         const isZero = unit === 'pct' && Math.abs(t.v) < 1e-6;
+        // Graduation masquée sous un badge de repère TP/SL (même colonne droite, illisible).
+        const underBadge = hlines.some(hl => { const hy = yAt(conv(hl.value)); return (!win || yInPlot(hy)) && Math.abs(hy - y) < 16; });
         return (
           <g key={i}>
             <line x1={padLeft} x2={padLeft + iw} y1={y} y2={y} stroke={isZero ? 'var(--hairline-strong)' : 'var(--hairline)'} strokeDasharray={isZero ? '' : '3 4'} />
-            <text x={padLeft + iw + 10} y={y + 4} fill="var(--text-muted)" fontSize="12" className="num">{t.label}</text>
+            {!underBadge && <text x={padLeft + iw + 10} y={y + 4} fill="var(--text-muted)" fontSize="12" className="num">{t.label}</text>}
           </g>
         );
       })}
@@ -5457,11 +5486,232 @@ function SharedNotesModal({ state, update, onClose }) {
 }
 
 /* =============================================================
+   VUE SIMPLE — « où j'en suis » d'un coup d'œil (téléphone)
+   -------------------------------------------------------------
+   Une seule page en lecture seule : valeur totale, latent / jour, valeurs si
+   TP / si SL, courbe Total avec ces deux repères, positions ouvertes de TOUS
+   les wallets triées par distance à la liquidation. Mêmes calculs que la vue
+   complète (agg, today, computeForecast) : c'est une vue, pas une autre source.
+   Aucune action d'édition (pas de fausse manip en pleine volatilité) ; toucher
+   une position ouvre son wallet en vue complète.
+   ============================================================= */
+const SIMPLE_RANGES = ['7J', '30J', '90J', 'TOUT'];
+// Distance à la liquidation : rouge sous 5 %, orange sous 10 %.
+const LIQ_DANGER_PCT = 5, LIQ_WARN_PCT = 10;
+
+/* Préférences d'affichage propres à l'appareil (clé séparée, jamais exportée : importer
+   le JSON de l'ordinateur ne doit pas changer la vue du téléphone). */
+function useUiPrefs() {
+  const [prefs, setPrefs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(UI_KEY) || '{}') || {}; } catch (e) { return {}; }
+  });
+  const patch = useCallback((d) => setPrefs(p => {
+    const next = { ...p, ...d };
+    try { localStorage.setItem(UI_KEY, JSON.stringify(next)); } catch (e) {}
+    return next;
+  }), []);
+  return [prefs, patch];
+}
+
+function useMedia(query) {
+  const [m, setM] = useState(() => !!(window.matchMedia && window.matchMedia(query).matches));
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const h = () => setM(mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', h); else mq.addListener(h);
+    return () => { if (mq.removeEventListener) mq.removeEventListener('change', h); else mq.removeListener(h); };
+  }, [query]);
+  return m;
+}
+
+// Horloge qui force un rendu toutes les `ms` (âge des données affiché à la seconde).
+function useNow(ms) {
+  const [n, setN] = useState(Date.now());
+  useEffect(() => { const id = setInterval(() => setN(Date.now()), ms); return () => clearInterval(id); }, [ms]);
+  return n;
+}
+
+// Âge d'une donnée à la seconde près (relTime arrondit à « à l'instant » sous 45 s).
+const agoShort = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 5) return 'à l’instant';
+  if (s < 60) return `il y a ${s} s`;
+  if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
+  return `il y a ${Math.floor(s / 3600)} h`;
+};
+
+/* Positions ouvertes de tous les wallets, à plat, la plus proche de sa liquidation d'abord. */
+function simplePositions(accounts, price) {
+  const rows = [];
+  for (const a of accounts) {
+    if (a.source === 'hyperliquid') {
+      for (const p of (((a.hl || {}).snapshot || {}).positions || [])) {
+        const dir = p.side === 'long' ? 1 : -1;
+        // Prix mark reconstitué du latent (unrealizedPnl = taille × (mark − entrée) × sens) :
+        // exact et aussi frais que le snapshot, quel que soit l'actif (ETH, kPEPE…).
+        const mark = p.size > 0 ? p.entryPrice + p.latent / (p.size * dir) : null;
+        rows.push({ key: a.id + ':' + p.coin, acc: a, coin: p.coin, side: p.side, lev: p.leverage,
+          entry: p.entryPrice, mark, liq: p.liqPrice, latent: p.latent, pct: safePct(p.latent, p.margin) });
+      }
+    } else {
+      for (const p of (a.positions || []).filter(x => x.status === 'open')) {
+        const latent = price != null ? posPnlOpen(p, price) : 0;
+        rows.push({ key: p.id, acc: a, coin: 'BTC', side: p.side, lev: p.leverage,
+          entry: p.entryPrice, mark: price, liq: posLiqPrice(p), latent, pct: safePct(latent, p.margin) });
+      }
+    }
+  }
+  for (const r of rows)
+    r.dist = (r.mark > 0 && r.liq > 0) ? (r.side === 'long' ? r.mark - r.liq : r.liq - r.mark) / r.mark * 100 : null;
+  return rows.sort((x, y) => (x.dist == null) - (y.dist == null) || (x.dist || 0) - (y.dist || 0));
+}
+
+function SimplePosRow({ r, onOpen }) {
+  const tone = r.dist == null ? null : r.dist <= LIQ_DANGER_PCT ? 'var(--loss)' : r.dist <= LIQ_WARN_PCT ? 'var(--warn)' : null;
+  const pct = Math.round(r.pct);                  // signe seulement si l'arrondi n'est pas nul (pas de « −0 % »)
+  return (
+    <button className="simple-pos" onClick={onOpen} title={'Ouvrir ' + r.acc.name + ' en vue complète'}>
+      <span className="simple-pos-top">
+        <span className="simple-pos-wallet"><ColorDot color={dsColor(r.acc.color)} size={8} /><span className="simple-pos-name">{r.acc.name}</span></span>
+        <Badge tone={r.side} size="sm">{r.side === 'long' ? 'L' : 'S'}</Badge>
+        {r.lev != null && <LeverageBadge value={r.lev} size="sm" color={idVar(r.acc.color)} />}
+        <span className="simple-pos-coin">{r.coin}</span>
+        <span className="simple-pos-pnl" style={{ color: r.latent >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+          {(r.latent >= 0 ? '+' : '') + numFmtSigned(r.latent, 0)}<span className="simple-pos-pct">{(pct > 0 ? '+' : pct < 0 ? MINUS : '') + Math.abs(pct)} %</span>
+        </span>
+      </span>
+      <span className="simple-pos-sub">
+        <span className="seg">Entrée {hlPx(r.entry)}</span>{' · '}
+        <span className="seg">Liq {r.liq > 0 ? hlPx(r.liq) : '—'}</span>
+        {r.dist != null && <>{' · '}<span className="seg simple-pos-dist" style={tone ? { color: tone } : undefined}>
+          {r.dist <= 0 ? 'liquidation atteinte' : 'à ' + r.dist.toFixed(r.dist < 10 ? 1 : 0) + ' %'}{tone ? ' ⚠' : ''}
+        </span></>}
+      </span>
+    </button>
+  );
+}
+
+/* Courbe Total seule, compacte, avec les repères globaux « si TP » / « si SL ». */
+function SimpleChart({ history, range, onRange, valTp, valSl }) {
+  const bodyRef = useRef(null);
+  const { w, h } = useSize(bodyRef);
+  const [hover, setHover] = useState(null);
+  const [hoverX, setHoverX] = useState(null);
+  const data = useMemo(() => {
+    if (rangeDays[range] === Infinity) return history;
+    const cut = todayStr(new Date(Date.now() - rangeDays[range] * 86400000));
+    return history.filter(s => s.date >= cut);
+  }, [history, range]);
+  const series = useMemo(() => [{ key: 'total', name: 'Total', stroke: 'var(--text-primary)', chipColor: 'var(--text-primary)', dash: false, data: data.map(s => s.equity) }], [data]);
+  const labels = useMemo(() => data.map(s => fmtDateShort(s.date)), [data]);
+  const hlines = [
+    valTp != null && { value: valTp, label: 'TP', color: 'var(--gain)' },
+    valSl != null && { value: valSl, label: 'SL', color: 'var(--loss)' },
+  ].filter(Boolean);
+  const hasData = data.length >= 2;
+  return (
+    <div className="simple-chart">
+      <div className="chart-body simple-chart-body" ref={bodyRef}>
+        <ChartCanvas key={range} series={series} labels={labels} unit="usdc" w={w} h={h} hover={hover} setHover={setHover}
+          hlines={hlines} setHoverX={setHoverX} />
+        {!hasData && <div className="chart-empty"><span style={{ fontSize: 'var(--text-sm)', maxWidth: 280 }}>Pas encore d’historique sur cette période.</span></div>}
+        {hasData && hover != null && data[hover] && (
+          <div className="chart-tip" style={{ left: Math.min(Math.max(0, (hoverX || 0) * 100), 62) + '%', top: 4 }}>
+            <div className="d">{fmtDateShort(data[hover].date)}</div>
+            <div className="r"><span className="k">Total</span><span className="v">{numFmtSigned(data[hover].equity, 0)}</span></div>
+          </div>
+        )}
+      </div>
+      <SegmentedControl size="sm" options={SIMPLE_RANGES} value={range} onChange={onRange} />
+    </div>
+  );
+}
+
+function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onOpenAccount, onFull }) {
+  const now = useNow(5000);
+  const fc = useMemo(() => computeForecast(accounts, price), [accounts, price]);
+  // Mêmes formules que la colonne KPI (somme exacte des panneaux).
+  const valTp = fc.hasOpen && fc.anyTp ? agg.equity - (agg.latent + agg.t0Latent) + fc.upPnl : null;
+  const valSl = fc.hasOpen ? agg.equity - (agg.latent + agg.t0Latent) + fc.downPnl : null;
+  const rows = useMemo(() => simplePositions(accounts, price), [accounts, price]);
+  // Fraîcheur = la donnée la PLUS ANCIENNE (cours BTC, synchro de chaque wallet suivi).
+  const stamps = [btcAt];
+  for (const a of accounts) if (a.source === 'hyperliquid') stamps.push((a.hl || {}).lastSync);
+  const times = stamps.filter(Boolean).map(t => new Date(t).getTime());
+  const oldest = times.length ? Math.min(...times) : null;
+  const hlErr = accounts.some(a => a.source === 'hyperliquid' && (a.hl || {}).error);
+  const age = oldest != null ? now - oldest : null;
+  const delta = (v) => <span className="simple-delta" style={{ color: v >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{(v >= 0 ? '+' : '') + numFmtSigned(v, 0)}</span>;
+  if (!accounts.length) return (
+    <div className="simple">
+      <div className="empty-note">Aucun portefeuille pour l’instant.</div>
+      <button className="simple-switch" onClick={onFull}>Vue complète ›</button>
+    </div>
+  );
+  return (
+    <div className="simple">
+      <section className="simple-card">
+        {/* Libellé et fraîcheur sur une ligne : chaque pixel de hauteur compte sur téléphone. */}
+        <div className="simple-top">
+          <span className="muted">Valeur totale</span>
+          <span className="simple-fresh">
+            <span className="muted simple-age" title={hlErr ? 'Une synchro Hyperliquid a échoué : le détail est dans le wallet (vue complète).' : undefined}
+              style={hlErr || (age != null && age > 3 * SIMPLE_REFRESH_MS) ? { color: 'var(--warn)' } : undefined}>
+              {hlErr ? '⚠ HL · ' : ''}{refreshing ? 'mise à jour…' : (age != null ? agoShort(age) : '—')}
+            </span>
+            <IconButton size="sm" label="Actualiser" onClick={onRefresh}><IRefresh /></IconButton>
+          </span>
+        </div>
+        <MoneyValue value={agg.equity} size="xl" colored="accent" />
+        <div className="simple-gains">
+          <span><span className="muted">Latent </span><MoneyValue value={agg.latent} size="sm" signed colored="pnl" showCurrency={false} /></span>
+          <span><span className="muted">Aujourd’hui </span><MoneyValue value={today.latent} size="sm" signed colored="pnl" showCurrency={false} /></span>
+        </div>
+        {fc.hasOpen && (
+          <div className="simple-targets">
+            <div className="simple-target">
+              <span className="muted">Si TP</span>
+              {valTp != null ? <span className="simple-target-val"><span className="gnum">{numFmt(valTp, 0)}</span>{delta(valTp - agg.equity)}</span> : <span className="muted">aucun TP</span>}
+            </div>
+            <div className="simple-target">
+              <span className="muted">Si SL / liq</span>
+              <span className="simple-target-val"><span className="gnum">{numFmt(valSl, 0)}</span>{delta(valSl - agg.equity)}</span>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="simple-card">
+        <SimpleChart history={history} range={range} onRange={onRange} valTp={valTp} valSl={valSl} />
+      </section>
+
+      <section className="simple-card">
+        <div className="simple-head"><span className="lbl">Positions ouvertes</span><span className="muted">{rows.length}</span></div>
+        {rows.length === 0 ? <div className="muted" style={{ padding: 'var(--space-2) 0' }}>Aucune position ouverte.</div>
+          : <div className="simple-pos-list">{rows.map(r => <SimplePosRow key={r.key} r={r} onOpen={() => onOpenAccount(r.acc.id)} />)}</div>}
+      </section>
+
+      <button className="simple-switch" onClick={onFull}>Vue complète ›</button>
+    </div>
+  );
+}
+
+/* =============================================================
    APP
    ============================================================= */
 function App() {
   const [state, update, replace, resync] = useStore();
-  const { loading, error: priceError, refresh } = useBtcPrice(state, update);
+  // Vue simple : choix mémorisé PAR APPAREIL (menu), automatique sur téléphone s'il n'y en
+  // a pas. « Vue complète › » et le toucher d'une position ne la quittent que le temps de la
+  // session (forceFull, non persisté) : le téléphone rouvre toujours sur l'essentiel.
+  const [ui, setUi] = useUiPrefs();
+  const isPhone = useMedia('(max-width: 640px)');
+  const [forceFull, setForceFull] = useState(false);
+  const simpleWanted = ui.simple != null ? !!ui.simple : isPhone;
+  const simple = simpleWanted && !forceFull;
+  const refreshMs = simple ? SIMPLE_REFRESH_MS : AUTO_REFRESH_MS;
+  const { loading, error: priceError, refresh } = useBtcPrice(state, update, refreshMs);
   const [createOpen, setCreateOpen] = useState(false);
   const [pineAllOpen, setPineAllOpen] = useState(false);
   const [snotesOpen, setSnotesOpen] = useState(false);
@@ -5588,8 +5838,13 @@ function App() {
           hl.lastFull = hl.lastSync;
         }
         hl.equityHistory = { ...(hl.equityHistory || {}), [todayStr()]: d.snapshot.equity };
-        // Point live (60 s) : la courbe du jour s'affine en continu tant que l'app est ouverte.
-        hl.samples = thinHlSamples([...(hl.samples || []), [Date.now(), d.snapshot.equity]].sort((a, b) => a[0] - b[0]));
+        // Point live : la courbe du jour s'affine en continu tant que l'app est ouverte.
+        // Au plus 1 par minute, quelle que soit la cadence de synchro (20 s en vue simple) :
+        // 3 points/min satureraient le plafond de 4 000 de thinHlSamples en ~22 h, et
+        // l'amincissement uniforme qui suivrait dégraderait TOUT l'historique.
+        const lastS = (hl.samples || [])[(hl.samples || []).length - 1];
+        if (!lastS || Date.now() - lastS[0] >= 55 * 1000)
+          hl.samples = thinHlSamples([...(hl.samples || []), [Date.now(), d.snapshot.equity]].sort((a, b) => a[0] - b[0]));
         hl.spotNote = d.spotNote;
         // Journal. La détection a besoin des fills, donc des synchros COMPLÈTES, et
         // vient après applyHlPortfolio pour interpoler `equityAtOpen` sur des
@@ -5616,10 +5871,27 @@ function App() {
   useEffect(() => { syncAllHl(true); /* eslint-disable-next-line */ }, []);
   useEffect(() => {
     if (!state.settings.autoRefresh) return;
-    const id = setInterval(() => syncAllHl(false), AUTO_REFRESH_MS);
+    const id = setInterval(() => syncAllHl(false), refreshMs);
     return () => clearInterval(id);
-  }, [state.settings.autoRefresh, syncAllHl]);
+  }, [state.settings.autoRefresh, syncAllHl, refreshMs]);
   const refreshAll = useCallback(() => { refresh(); syncAllHl(false); }, [refresh, syncAllHl]);
+  // Retour sur l'app (téléphone sorti de la poche) : données rafraîchies tout de suite si
+  // elles ont plus de 15 s, sans attendre le prochain tick (suspendu en arrière-plan).
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== 'visible' || !stateRef.current.settings.autoRefresh) return;
+      const at = stateRef.current.btc.updatedAt;
+      if (!at || Date.now() - new Date(at).getTime() > 15 * 1000) refreshAll();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [refreshAll]);
+  // Toucher une position en vue simple : son wallet en vue complète, panneau à l'écran.
+  const openAccountFull = (id) => {
+    setForceFull(true);
+    update(s => { s.settings.view = 'live'; s.settings.liveAcct = id; });
+    setTimeout(() => { const el = document.querySelector('.accttabs'); if (el) el.scrollIntoView({ block: 'start' }); }, 60);
+  };
 
   const view = state.settings.view || 'live';
   const createAccount = (d) => {
@@ -5803,8 +6075,16 @@ function App() {
           onBackfill={backfillHistory} backfilling={backfilling}
           theme={state.settings.theme} onToggleTheme={toggleTheme}
           autoRefresh={state.settings.autoRefresh} onToggleAuto={toggleAuto}
-          onPine={() => setPineAllOpen(true)} onSnotes={() => setSnotesOpen(true)} />
+          onPine={() => setPineAllOpen(true)} onSnotes={() => setSnotesOpen(true)}
+          simple={simpleWanted} onToggleSimple={() => { setUi({ simple: !simpleWanted }); setForceFull(false); }} />
 
+        {simple ? (
+          <SimpleView agg={agg} today={today} price={price} btcAt={state.btc.updatedAt} accounts={state.accounts} history={history}
+            range={SIMPLE_RANGES.includes(ui.simpleRange) ? ui.simpleRange : '30J'} onRange={(r) => setUi({ simpleRange: r })}
+            onRefresh={refreshAll} refreshing={loading} onOpenAccount={openAccountFull}
+            onFull={() => { setForceFull(true); window.scrollTo(0, 0); }} />
+        ) : (<>
+        {simpleWanted && <button className="simple-back" onClick={() => { setForceFull(false); window.scrollTo(0, 0); }}>‹ Vue simple</button>}
         <div className="viewnav-row">
           <nav className="viewnav">
             <button aria-pressed={view === 'live'} onClick={() => setView('live')}>Live</button>
@@ -5857,6 +6137,7 @@ function App() {
               : <div className="empty-note">Crée ta première simulation pour commencer (bouton +).</div>}
           </>
         )}
+        </>)}
       </div>
 
       {createOpen && <CreateAccountModal usedColors={usedColors} onClose={() => setCreateOpen(false)} onCreate={createAccount}

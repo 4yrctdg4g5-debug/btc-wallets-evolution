@@ -1,7 +1,7 @@
 # BTC Wallets Evolution — v2
 
 Suivi local de comptes de trading BTC à effet de levier (long/short, USDC).
-Application autonome : **un seul `index.html`** (logique + UI inline), React + Babel et police **Geist** embarqués, aucun build, aucun serveur. Hors-ligne, sauf le prix BTC (CoinGecko) et la synchro des wallets Hyperliquid.
+Application autonome : **un seul `index.html`** (logique + UI inline), React + Babel et police **Geist** embarqués, aucun build, aucun serveur. Hors-ligne, sauf le prix BTC (mid Hyperliquid, repli CoinGecko ; historique CoinGecko) et la synchro des wallets Hyperliquid.
 
 Design system « functional dark minimalism » (dossier `BTC Wallets Design System/`, bundle `_ds_bundle.js`) : **accent monochrome** (blanc en sombre / noir en clair — l'orange `--warn` est réservé à l'escalade du levier), couleurs réservées au sens (gain/perte), thème sombre/clair.
 
@@ -19,6 +19,8 @@ Design system « functional dark minimalism » (dossier `BTC Wallets Design Syst
 ## Fonctionnalités
 
 **Vue Live** — dashboard 2 colonnes : colonne KPI (valeur totale, gains avec bascule USDC⇄%, projections « Valeur si TP / si SL-liq », exposition, win rate, **section Journal**) | graphe global `EvoChart` (série Total / Cash / une par compte). En dessous, un onglet par compte.
+
+**Vue simple** (téléphone) — « où j'en suis » sur un écran, en lecture seule : valeur totale (+ âge des données et bouton actualiser), latent et variation du jour, valeurs si TP / si SL avec l'écart, courbe Total (7J/30J/90J/TOUT) avec les repères TP/SL, positions ouvertes de tous les wallets triées par distance à la liquidation (orange < 10 %, rouge < 5 %). Automatique sur écran ≤ 640 px ; interrupteur « Vue simple » dans le menu (mémorisé sur l'appareil, clé `bwe.ui.v1`, hors export) ; « Vue complète › » ou toucher une position = vue complète le temps de la session. Données rafraîchies toutes les 20 s (60 s en vue complète) et dès le retour sur l'app.
 
 **Comptes manuels** — saisie marge + levier + prix d'entrée (quantité/liq. dérivées), TP/SL optionnels, dates antidatables, frais, clôture avec presets TP/SL, notes de trade (mini-markup), trésorerie datée, stratégies, duplication, graphe par compte `AccountChart` (repères TP/SL, marqueurs de trades cliquables → la ligne du trade s'affiche sous le graphe, avec ses notes).
 
@@ -65,6 +67,7 @@ Total    = Équity − Capital net            (= Réalisé + Latent)
 | `bwe.owner.v1` | bail d'écriture : **un seul onglet persiste** (les autres suivent et peuvent « prendre la main ») ; libéré à la sortie de page (`pagehide`, fiable sur mobile), abandonné après 60 s sans renouvellement |
 | `bwe.state.broken.<ts>` | quarantaine d'un document illisible (copie, jamais écrasé) |
 | `bwe.journal.backup.v1` | sauvegarde séparée des **saisies manuelles du journal** (seule donnée non retéléchargeable) |
+| `bwe.ui.v1` | préférences d'affichage **de l'appareil** (vue simple, période du graphe simple) — jamais exportées |
 
 - Export/Import JSON via le menu ⋯. L'import **rejoue les migrations** comme le chargement et double-confirme si des saisies de journal seraient perdues.
 - Exporter régulièrement : le `localStorage` est lié au navigateur.

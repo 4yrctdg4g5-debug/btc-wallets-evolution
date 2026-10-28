@@ -72,6 +72,37 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Vue simple (téléphone — `SimpleView`, ajoutée le 2026-10-28)
+
+```
+  ₿              [● 81,673 $]  ⟳  ⋯          ← Header (inchangé ; menu ⋯ → « Vue simple »)
+  ┌─ .simple-card ─────────────────────┐
+  │ Valeur totale        il y a 5 s ⟳  │     ← .simple-top : âge de la donnée la plus ancienne
+  │ 17,260.19 USDC                     │       (cours BTC, synchro de chaque wallet HL)
+  │ Latent −309   Aujourd'hui +396     │     ← .simple-gains (agg.latent, today.latent)
+  │ ──────────────────────────────────│
+  │ Si TP 24,151 +6,891 │ Si SL 13,569 −3,691 │ ← .simple-targets (mêmes formules que SummaryBar)
+  └────────────────────────────────────┘
+  ┌─ SimpleChart (150 px) ─────────────┐     ← courbe Total seule + hlines TP/SL globales
+  │  TP - - - - - - - - - - [24,151]   │       (graduations masquées sous les badges)
+  │  ────╱╲──╱╲───                      │
+  │  SL - - - - - - - - - - [13,569]   │
+  │ [7J] [30J] [90J] [TOUT]            │     ← période mémorisée dans bwe.ui.v1
+  └────────────────────────────────────┘
+  ┌─ Positions ouvertes · 3 ───────────┐     ← simplePositions : tous wallets, triés par
+  │ ● Bybit (S)(20×) BTC     +83  +6 % │       distance à la liquidation croissante
+  │   Entrée 81,900 · Liq 85,995 · à 5.3 % ⚠ │ ← orange < 10 %, rouge < 5 %
+  └────────────────────────────────────┘
+               Vue complète ›                ← forceFull (session) ; toucher une ligne = idem
+                                               + wallet sélectionné ; « ‹ Vue simple » en tête
+```
+
+Activation : `ui.simple` (clé `bwe.ui.v1`, par appareil, hors export) sinon automatique
+≤640px (`useMedia`). Lecture seule. Cadence de rafraîchissement 20 s (`SIMPLE_REFRESH_MS`)
+au lieu de 60 s ; actualisation immédiate au retour sur l'app si données > 15 s ; point
+live de `hl.samples` limité à 1/min quelle que soit la cadence. Mark price HL reconstitué
+du latent du snapshot (`entrée + latent / (taille × sens)`).
+
 ### Vue Simulation (un onglet sim)
 
 ```
