@@ -208,9 +208,13 @@
 
 **Persistance** — Tout l'état vit dans `localStorage` clé `bwe.state.v1` ;
 `useStore.update()` clone profond + `persist()` à **chaque** mutation — mais **un seul
-onglet écrit** : bail d'écriture `bwe.owner.v1` (ré-estampillé 20 s, bail 3 min, bandeau
-`SaveWarning` + « Prendre la main » dans les onglets non-propriétaires, qui suivent
-passivement via l'événement `storage`). Un document illisible part en **quarantaine**
+onglet écrit** : bail d'écriture `bwe.owner.v1` (ré-estampillé 20 s, réputé abandonné
+après 60 s, bandeau `SaveWarning` + « Prendre la main » dans les onglets
+non-propriétaires, qui suivent passivement via l'événement `storage`). Libéré sur
+`pagehide` (+ `beforeunload`) — seul événement de sortie fiable sur mobile ; repris dès le
+retour sur la page (`visibilitychange`/`pageshow`) ; tout onglet qui reprend le bail
+**relit d'abord** le document (`resync`), sa mémoire pouvant dater d'avant les écritures
+d'un autre onglet. Un document illisible part en **quarantaine**
 (copie `bwe.state.broken.<ts>`, toute écriture bloquée) au lieu d'être écrasé. La part
 **saisie à la main** du journal est doublée sous `bwe.journal.backup.v1` (restauration
 depuis les réglages du journal). Au chargement, `loadState` fusionne avec

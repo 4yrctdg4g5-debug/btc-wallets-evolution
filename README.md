@@ -62,7 +62,7 @@ Total    = Équity − Capital net            (= Réalisé + Latent)
 | Clé localStorage | Contenu |
 |---|---|
 | `bwe.state.v1` | le document complet (auto à chaque action) |
-| `bwe.owner.v1` | bail d'écriture : **un seul onglet persiste** (les autres suivent et peuvent « prendre la main ») |
+| `bwe.owner.v1` | bail d'écriture : **un seul onglet persiste** (les autres suivent et peuvent « prendre la main ») ; libéré à la sortie de page (`pagehide`, fiable sur mobile), abandonné après 60 s sans renouvellement |
 | `bwe.state.broken.<ts>` | quarantaine d'un document illisible (copie, jamais écrasé) |
 | `bwe.journal.backup.v1` | sauvegarde séparée des **saisies manuelles du journal** (seule donnée non retéléchargeable) |
 

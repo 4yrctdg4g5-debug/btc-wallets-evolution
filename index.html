@@ -40,7 +40,11 @@ const JOURNAL_BACKUP_KEY = 'bwe.journal.backup.v1';   // saisies du journal, cl�
 const OWNER_RENEW_MS = 20 * 1000;             // ré-estampillage du bail
 const STALE_MS = 5 * 60 * 1000;
 const AUTO_REFRESH_MS = 60 * 1000;
-const OWNER_LEASE_MS = 3 * AUTO_REFRESH_MS;   // au-delà, le bail est réputé abandonné
+// Au-delà, le bail est réputé abandonné : 3 renouvellements manqués (60 s). Une page tuée
+// sans événement (appli fermée depuis le sélecteur du téléphone) bloquait l'onglet suivant
+// 3 min avec l'ancien seuil. Sans risque : persist revérifie le bail à chaque écriture, et
+// l'onglet qui reprend le bail relit d'abord le document (tick d'App → resync).
+const OWNER_LEASE_MS = 3 * OWNER_RENEW_MS;
 const HL_API = 'https://api.hyperliquid.xyz/info';
 const HL_FULL_SYNC_MS = 10 * 60 * 1000;     // synchro complète (portfolio/fills/ledger) au plus toutes les 10 min
 const HL_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -1127,7 +1131,10 @@ function useStore() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
-  return [state, update, replace];
+  // Relecture du document stocké, SANS écrire : appelée quand l'onglet reprend le bail
+  // (sa mémoire peut dater d'avant les écritures d'un autre onglet).
+  const resync = useCallback(() => setState(loadState()), []);
+  return [state, update, replace, resync];
 }
 
 /* =============================================================
@@ -5453,7 +5460,7 @@ function SharedNotesModal({ state, update, onClose }) {
    APP
    ============================================================= */
 function App() {
-  const [state, update, replace] = useStore();
+  const [state, update, replace, resync] = useStore();
   const { loading, error: priceError, refresh } = useBtcPrice(state, update);
   const [createOpen, setCreateOpen] = useState(false);
   const [pineAllOpen, setPineAllOpen] = useState(false);
@@ -5468,11 +5475,36 @@ function App() {
   // L'opération est idempotente, et il n'y a pas de StrictMode ici.
   const [owner, setOwner] = useState(() => refreshOwnerLease());
   useEffect(() => {
-    const tick = () => setOwner(refreshOwnerLease());
+    // Reprise du bail par CET onglet (libre ou périmé) : on relit d'abord le document —
+    // un autre onglet a pu écrire pendant qu'on était en lecture seule ou suspendu
+    // (téléphone en arrière-plan, page en cache), et persist réécrit TOUT depuis la mémoire.
+    const tick = () => {
+      const had = isOwner();
+      const ok = refreshOwnerLease();
+      if (ok && !had) resync();
+      setOwner(ok);
+    };
+    // Retour sur la page (onglet réaffiché, page restaurée du cache) : reprise immédiate,
+    // sans attendre le prochain tick de 20 s.
+    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
     tick();
     const id = setInterval(tick, OWNER_RENEW_MS);
+    // pagehide : seul événement de sortie fiable sur mobile (Safari iOS n'émet jamais
+    // beforeunload, Chrome Android rarement). Sans lui, une page rechargée ou rouverte
+    // trouvait le bail de la précédente encore « frais » et restait en lecture seule
+    // jusqu'à 3 min — « Prendre la main », qui recharge, retombait dans le même piège.
     window.addEventListener('beforeunload', releaseOwner);
-    return () => { clearInterval(id); window.removeEventListener('beforeunload', releaseOwner); releaseOwner(); };
+    window.addEventListener('pagehide', releaseOwner);
+    window.addEventListener('pageshow', tick);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('beforeunload', releaseOwner);
+      window.removeEventListener('pagehide', releaseOwner);
+      window.removeEventListener('pageshow', tick);
+      document.removeEventListener('visibilitychange', onVisible);
+      releaseOwner();
+    };
   }, []);
 
   const price = state.btc.price;
