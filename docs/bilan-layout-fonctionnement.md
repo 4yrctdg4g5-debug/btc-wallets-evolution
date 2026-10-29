@@ -92,7 +92,8 @@
   └────────────────────────────────────┘
   ┌─ Positions ouvertes · 3 ───────────┐     ← simplePositions : tous wallets, triés par
   │ ● Bybit (S)(20×) BTC     +83  +6 % │       distance à la liquidation croissante
-  │   Entrée 81,900 · Liq 85,995 · à 5.3 % ⚠ │ ← orange < 10 %, rouge < 5 %
+  │ TP 78,000 · à 4.8 %  Liq 85,995 · à 5.3 % ⚠ │ ← 2 colonnes alignées (écart en % du mark,
+                                               TP « — » si aucun) ; liq orange < 10 %, rouge < 5 %
   └────────────────────────────────────┘
                Vue complète ›                ← forceFull (session) — seul moyen de basculer
                                                (lignes passives) ; « ‹ Vue simple » en tête

@@ -5608,23 +5608,30 @@ function simplePositions(accounts, price) {
         // exact et aussi frais que le snapshot, quel que soit l'actif (ETH, kPEPE…).
         const mark = p.size > 0 ? p.entryPrice + p.latent / (p.size * dir) : null;
         rows.push({ key: a.id + ':' + p.coin, acc: a, coin: p.coin, side: p.side, lev: p.leverage,
-          entry: p.entryPrice, mark, liq: p.liqPrice, latent: p.latent, pct: safePct(p.latent, p.margin) });
+          entry: p.entryPrice, mark, liq: p.liqPrice, tp: p.tp, latent: p.latent, pct: safePct(p.latent, p.margin) });
       }
     } else {
       for (const p of (a.positions || []).filter(x => x.status === 'open')) {
         const latent = price != null ? posPnlOpen(p, price) : 0;
         rows.push({ key: p.id, acc: a, coin: 'BTC', side: p.side, lev: p.leverage,
-          entry: p.entryPrice, mark: price, liq: posLiqPrice(p), latent, pct: safePct(latent, p.margin) });
+          entry: p.entryPrice, mark: price, liq: posLiqPrice(p), tp: p.tp, latent, pct: safePct(latent, p.margin) });
       }
     }
   }
-  for (const r of rows)
-    r.dist = (r.mark > 0 && r.liq > 0) ? (r.side === 'long' ? r.mark - r.liq : r.liq - r.mark) / r.mark * 100 : null;
+  // Distances en % du prix mark, positives tant que le niveau n'est pas atteint.
+  const dist = (r, from, to) => (r.mark > 0 && from > 0 && to > 0) ? (r.side === 'long' ? to - from : from - to) / r.mark * 100 : null;
+  for (const r of rows) {
+    r.dist = dist(r, r.liq, r.mark);
+    r.tpDist = dist(r, r.mark, r.tp);
+  }
   return rows.sort((x, y) => (x.dist == null) - (y.dist == null) || (x.dist || 0) - (y.dist || 0));
 }
 
+const distFmt = (d) => d.toFixed(d < 10 ? 1 : 0) + ' %';
+
 // Ligne passive : toucher une position ne change pas de vue (choix utilisateur — basculer
 // d'un coup en vue complète était trop radical) ; seul « Vue complète › » le fait.
+// 2e ligne : TP | Liq en deux colonnes, alignées d'une position à l'autre.
 function SimplePosRow({ r }) {
   const tone = r.dist == null ? null : r.dist <= LIQ_DANGER_PCT ? 'var(--loss)' : r.dist <= LIQ_WARN_PCT ? 'var(--warn)' : null;
   const pct = Math.round(r.pct);                  // signe seulement si l'arrondi n'est pas nul (pas de « −0 % »)
@@ -5640,11 +5647,16 @@ function SimplePosRow({ r }) {
         </span>
       </span>
       <span className="simple-pos-sub">
-        <span className="seg">Entrée {hlPx(r.entry)}</span>{' · '}
-        <span className="seg">Liq {r.liq > 0 ? hlPx(r.liq) : '—'}</span>
-        {r.dist != null && <>{' · '}<span className="seg simple-pos-dist" style={tone ? { color: tone } : undefined}>
-          {r.dist <= 0 ? 'liquidation atteinte' : 'à ' + r.dist.toFixed(r.dist < 10 ? 1 : 0) + ' %'}{tone ? ' ⚠' : ''}
-        </span></>}
+        <span>
+          <span className="seg">TP {r.tp > 0 ? hlPx(r.tp) : '—'}</span>
+          {r.tpDist != null && <>{' · '}<span className="seg">{r.tpDist <= 0 ? 'atteint' : 'à ' + distFmt(r.tpDist)}</span></>}
+        </span>
+        <span>
+          <span className="seg">Liq {r.liq > 0 ? hlPx(r.liq) : '—'}</span>
+          {r.dist != null && <>{' · '}<span className="seg simple-pos-dist" style={tone ? { color: tone } : undefined}>
+            {r.dist <= 0 ? 'atteinte' : 'à ' + distFmt(r.dist)}{tone ? ' ⚠' : ''}
+          </span></>}
+        </span>
       </span>
     </div>
   );
