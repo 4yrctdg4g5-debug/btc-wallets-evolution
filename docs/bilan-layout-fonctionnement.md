@@ -75,16 +75,17 @@
 ### Vue simple (téléphone — `SimpleView`, ajoutée le 2026-10-28)
 
 ```
-  ₿              [● 81,673 $]  ⟳  ⋯          ← Header (inchangé ; menu ⋯ → « Vue simple »)
+  ₿              [● 81,673 $]  ⟳  ⋯          ← Header (resserré ≤640px : barre 44 px, prix à 8 px
+                                               du haut au lieu de 24 ; menu ⋯ → « Vue simple »)
   ┌─ .simple-card ─────────────────────┐
   │ Valeur totale        il y a 5 s ⟳  │     ← .simple-top : âge de la donnée la plus ancienne
   │ 17,260.19 USDC                     │       (cours BTC, synchro de chaque wallet HL)
   │ Latent −309   Aujourd'hui +396     │     ← .simple-gains (agg.latent, today.latent)
-  │ ──────────────────────────────────│
-  │ Si TP 24,151 +6,891 │ Si SL 13,569 −3,691 │ ← .simple-targets (mêmes formules que SummaryBar)
   └────────────────────────────────────┘
-  ┌─ SimpleChart (150 px) ─────────────┐     ← courbe Total seule + hlines TP/SL globales
-  │  TP - - - - - - - - - - [24,151]   │       (graduations masquées sous les badges)
+  ┌─ SimpleChart (36svh, 170–320 px) ──┐     ← courbe Total seule + hlines TP/SL globales
+  │  TP - - - - - - - - - - [24,151]   │       (mêmes formules que SummaryBar ; les valeurs
+  │                                    │       si TP / si SL ne sont QUE dans ces badges ;
+  │                                    │       graduations masquées sous les badges)
   │  ────╱╲──╱╲───                      │
   │  SL - - - - - - - - - - [13,569]   │
   │ [7J] [30J] [90J] [TOUT]            │     ← période mémorisée dans bwe.ui.v1

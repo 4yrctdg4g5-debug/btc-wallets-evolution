@@ -2126,7 +2126,7 @@ function useSize(ref) {
   const [size, setSize] = useState({ w: 900, h: 300 });
   // Mesure AVANT la première peinture (useLayoutEffect) : sinon le graphe se dessine une
   // image à la taille par défaut (900×300) et déborde de son cadre — flagrant sur la vue
-  // simple, dont le graphe ne fait que 150 px de haut.
+  // simple, dont le graphe est bien moins haut.
   useLayoutEffect(() => {
     if (!ref.current) return;
     const { clientWidth: w0, clientHeight: h0 } = ref.current;
@@ -5544,12 +5544,12 @@ function SharedNotesModal({ state, update, onClose }) {
 /* =============================================================
    VUE SIMPLE — « où j'en suis » d'un coup d'œil (téléphone)
    -------------------------------------------------------------
-   Une seule page en lecture seule : valeur totale, latent / jour, valeurs si
-   TP / si SL, courbe Total avec ces deux repères, positions ouvertes de TOUS
-   les wallets triées par distance à la liquidation. Mêmes calculs que la vue
-   complète (agg, today, computeForecast) : c'est une vue, pas une autre source.
-   Aucune action d'édition (pas de fausse manip en pleine volatilité) ; toucher
-   une position ouvre son wallet en vue complète.
+   Une seule page en lecture seule : valeur totale, latent / jour, courbe Total
+   avec les repères si TP / si SL (leurs valeurs ne sont que là, dans les badges),
+   positions ouvertes de TOUS les wallets triées par distance à la liquidation.
+   Mêmes calculs que la vue complète (agg, today, computeForecast) : c'est une vue,
+   pas une autre source. Aucune action d'édition (pas de fausse manip en pleine
+   volatilité).
    ============================================================= */
 const SIMPLE_RANGES = ['7J', '30J', '90J', 'TOUT'];
 // Distance à la liquidation : rouge sous 5 %, orange sous 10 %.
@@ -5689,7 +5689,7 @@ function SimpleChart({ history, range, onRange, valTp, valSl }) {
 function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onFull }) {
   const now = useNow(5000);
   const fc = useMemo(() => computeForecast(accounts, price), [accounts, price]);
-  // Mêmes formules que la colonne KPI (somme exacte des panneaux).
+  // Repères du graphe : mêmes formules que la colonne KPI (somme exacte des panneaux).
   const valTp = fc.hasOpen && fc.anyTp ? agg.equity - (agg.latent + agg.t0Latent) + fc.upPnl : null;
   const valSl = fc.hasOpen ? agg.equity - (agg.latent + agg.t0Latent) + fc.downPnl : null;
   const rows = useMemo(() => simplePositions(accounts, price), [accounts, price]);
@@ -5700,7 +5700,6 @@ function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRang
   const oldest = times.length ? Math.min(...times) : null;
   const hlErr = accounts.some(a => a.source === 'hyperliquid' && (a.hl || {}).error);
   const age = oldest != null ? now - oldest : null;
-  const delta = (v) => <span className="simple-delta" style={{ color: v >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{(v >= 0 ? '+' : '') + numFmtSigned(v, 0)}</span>;
   if (!accounts.length) return (
     <div className="simple">
       <div className="empty-note">Aucun portefeuille pour l’instant.</div>
@@ -5726,18 +5725,6 @@ function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRang
           <span><span className="muted">Latent </span><MoneyValue value={agg.latent} size="sm" signed colored="pnl" showCurrency={false} /></span>
           <span><span className="muted">Aujourd’hui </span><MoneyValue value={today.latent} size="sm" signed colored="pnl" showCurrency={false} /></span>
         </div>
-        {fc.hasOpen && (
-          <div className="simple-targets">
-            <div className="simple-target">
-              <span className="muted">Si TP</span>
-              {valTp != null ? <span className="simple-target-val"><span className="gnum">{numFmt(valTp, 0)}</span>{delta(valTp - agg.equity)}</span> : <span className="muted">aucun TP</span>}
-            </div>
-            <div className="simple-target">
-              <span className="muted">Si SL / liq</span>
-              <span className="simple-target-val"><span className="gnum">{numFmt(valSl, 0)}</span>{delta(valSl - agg.equity)}</span>
-            </div>
-          </div>
-        )}
       </section>
 
       <section className="simple-card">

@@ -539,14 +539,12 @@
 .simple-top > .muted { white-space: nowrap; flex: none; }
 .simple-fresh { display: inline-flex; align-items: center; gap: 2px; min-width: 0; font-variant-numeric: tabular-nums; }
 .simple-age { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.simple-target-val { display: inline-flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
 .simple-gains { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); align-items: baseline; }
 .simple-gains > span { display: inline-flex; align-items: baseline; gap: 6px; }
-.simple-targets { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); border-top: 1px solid var(--hairline); padding-top: var(--space-2); margin-top: 2px; }
-.simple-target { display: flex; flex-direction: column; gap: 1px; }
-.simple-delta { font-size: var(--text-xs); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; }
 .simple-chart { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
-.chart-body.simple-chart-body { height: 150px; }
+/* Hauteur suivant l'écran : le graphe prend la place libérée en haut de page
+   (150 px = repli sans unité svh) ; les positions restent atteignables d'un geste. */
+.chart-body.simple-chart-body { height: 150px; height: clamp(170px, 36svh, 320px); }
 .simple-head { display: flex; align-items: baseline; justify-content: space-between; }
 .simple-pos-list { display: flex; flex-direction: column; }
 /* Ligne de position : passive (seul « Vue complète › » change de vue) */
@@ -585,7 +583,10 @@
      (!important : les composants du DS posent leur taille en style inline). */
   input, select, textarea { font-size: 16px !important; }
 
-  .wrap { padding: var(--space-4) var(--space-4) var(--space-12); }
+  /* En-tête resserré : 24 px au-dessus du prix et 20 px entre le prix et la 1re carte, c'était autant de
+     hauteur prise au graphe de la vue simple (la barre d'état du téléphone est déjà au-dessus). */
+  .wrap { padding: var(--space-1) var(--space-4) var(--space-12); }
+  .topbar { height: 44px; margin-bottom: var(--space-2); }
   .grid2, .grid3, .margin-pct { grid-template-columns: 1fr; }
   .brand-name { font-size: var(--text-md); }
   .btc-pill .time { display: none; }
@@ -631,7 +632,6 @@
   /* Vue simple : cartes plus serrées pour tout voir sans (presque) défiler */
   .simple { gap: var(--space-2); }
   .simple-card { padding: var(--space-3); }
-  .topbar { margin-bottom: var(--space-3); }
 }
 /* Très petit écran : monogramme seul */
 @media (max-width: 480px) {
