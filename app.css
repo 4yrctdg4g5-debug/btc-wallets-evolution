@@ -563,6 +563,18 @@
 .simple-pos-sub { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-3);
   font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .simple-pos-dist { font-weight: var(--weight-medium); }
+/* Wallets : une grille par ligne, colonnes de chiffres de largeur fixe (alignées d'une ligne à l'autre) */
+.simple-wal { display: flex; flex-direction: column; }
+.simple-wal-row { display: grid; grid-template-columns: minmax(0, 1fr) 5em 5em; column-gap: var(--space-3); align-items: baseline; padding: var(--space-2) 0; border-top: 1px solid var(--hairline); }
+.simple-wal-hrow { border-top: none; padding: 0 0 2px; font-size: var(--text-xs); color: var(--text-muted); }
+.simple-wal-hrow > span { text-align: right; white-space: nowrap; }
+.simple-wal-id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.simple-wal-id > .simple-pos-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.simple-wal-name { font-size: var(--text-sm); font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.simple-wal-num { text-align: right; font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-secondary); }
+.simple-wal-cash { font-weight: var(--weight-semibold); color: var(--text-primary); }
+.simple-wal-tot { font-size: var(--text-sm); }
+.simple-wal-tot > .simple-wal-num { font-weight: var(--weight-semibold); }
 .simple-switch, .simple-back {
   appearance: none; background: transparent; border: none; cursor: pointer;
   font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-secondary);

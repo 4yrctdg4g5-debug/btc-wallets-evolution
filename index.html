@@ -5662,6 +5662,42 @@ function SimplePosRow({ r }) {
   );
 }
 
+/* Wallets : de quoi se positionner vite — valeur et cash dispo de chaque wallet, dans
+   l'ordre de l'app. Grandeurs de STOCK (accAt du jour) : indépendantes du T0, mêmes
+   chiffres que les panneaux « Valeur » / « Cash dispo » de la vue complète. */
+function SimpleWallets({ accounts, price }) {
+  const rows = accounts.map(a => {
+    const r = accAt(a, todayStr(), price);
+    const nPos = a.source === 'hyperliquid' ? ((((a.hl || {}).snapshot || {}).positions) || []).length
+      : (a.positions || []).filter(x => x.status === 'open').length;
+    return { acc: a, equity: r.equity, cash: r.cash, margin: r.openMargin, nPos, err: a.source === 'hyperliquid' && !!(a.hl || {}).error };
+  });
+  const tot = rows.reduce((t, r) => ({ equity: t.equity + r.equity, cash: t.cash + r.cash }), { equity: 0, cash: 0 });
+  return (
+    <div className="simple-wal">
+      <div className="simple-wal-row simple-wal-hrow"><span /><span>Valeur</span><span>Cash dispo</span></div>
+      {rows.map(r => (
+        <div className="simple-wal-row" key={r.acc.id}>
+          <span className="simple-wal-id">
+            <span className="simple-pos-wallet"><ColorDot color={dsColor(r.acc.color)} size={8} /><span className="simple-wal-name">{r.acc.name}</span>
+              {r.err && <span style={{ color: 'var(--warn)' }} title="Dernière synchro Hyperliquid en échec : chiffres possiblement anciens.">⚠</span>}</span>
+            <span className="simple-pos-sub">{r.nPos === 0 ? 'à plat' : r.nPos + ' position' + (r.nPos > 1 ? 's' : '') + (r.margin > 0 ? ' · marge ' + numFmt(r.margin, 0) : '')}</span>
+          </span>
+          <span className="simple-wal-num">{numFmt(r.equity, 0)}</span>
+          <span className="simple-wal-num simple-wal-cash">{numFmt(r.cash, 0)}</span>
+        </div>
+      ))}
+      {rows.length > 1 && (
+        <div className="simple-wal-row simple-wal-tot">
+          <span className="muted">Total</span>
+          <span className="simple-wal-num">{numFmt(tot.equity, 0)}</span>
+          <span className="simple-wal-num simple-wal-cash">{numFmt(tot.cash, 0)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* Courbe Total seule, compacte, avec les repères globaux « si TP » / « si SL ». */
 function SimpleChart({ history, range, onRange, valTp, valSl }) {
   const bodyRef = useRef(null);
@@ -5747,6 +5783,11 @@ function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRang
         <div className="simple-head"><span className="lbl">Positions ouvertes</span><span className="muted">{rows.length}</span></div>
         {rows.length === 0 ? <div className="muted" style={{ padding: 'var(--space-2) 0' }}>Aucune position ouverte.</div>
           : <div className="simple-pos-list">{rows.map(r => <SimplePosRow key={r.key} r={r} />)}</div>}
+      </section>
+
+      <section className="simple-card">
+        <div className="simple-head"><span className="lbl">Wallets</span><span className="muted">{accounts.length}</span></div>
+        <SimpleWallets accounts={accounts} price={price} />
       </section>
 
       <button className="simple-switch" onClick={onFull}>Vue complète ›</button>

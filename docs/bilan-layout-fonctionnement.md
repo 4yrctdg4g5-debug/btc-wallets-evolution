@@ -95,6 +95,12 @@
   │ TP 78,000 · à 4.8 %  Liq 85,995 · à 5.3 % ⚠ │ ← 2 colonnes alignées (écart en % du mark,
                                                TP « — » si aucun) ; liq orange < 10 %, rouge < 5 %
   └────────────────────────────────────┘
+  ┌─ Wallets · 3 ──────────────────────┐     ← SimpleWallets (.simple-wal) : ordre de l'app,
+  │                 Valeur  Cash dispo │       accAt du jour (stock, hors T0) — mêmes chiffres
+  │ ● Bybit         12,500    12,500   │       que « Valeur » / « Cash dispo » des panneaux
+  │   à plat                           │     ← nb de positions · marge engagée ; ⚠ si synchro HL KO
+  │ Total           16,731    16,731   │     ← ligne Total si ≥ 2 wallets
+  └────────────────────────────────────┘
                Vue complète ›                ← forceFull (session) — seul moyen de basculer
                                                (lignes passives) ; « ‹ Vue simple » en tête
 ```
