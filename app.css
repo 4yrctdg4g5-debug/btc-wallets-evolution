@@ -585,8 +585,9 @@
 }
 .simple-ord:first-child { padding-top: 0; }
 .simple-ord-lbl { font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
-/* Prix cible + distance en gris, comme les lignes secondaires de la carte 3 (.simple-pos-sub) */
-.simple-ord-px { margin-left: auto; font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Infos secondaires (marge, prix cible, distance) en gris clair, comme les lignes secondaires de la carte 3 (.simple-pos-sub) */
+.simple-ord-sec { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.simple-ord-push { margin-left: auto; }
 .simple-switch, .simple-back {
   appearance: none; background: transparent; border: none; cursor: pointer;
   font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-secondary);
