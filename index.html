@@ -471,6 +471,15 @@ function mapHlSnapshot(ch, orders, spot) {
     openMargin: hlNum(ms.totalMarginUsed),
     latent: positions.reduce((s, p) => s + p.latent, 0),
     positions,
+    // Ordres limites RESTANTS (non-trigger, perp uniquement — le spot a un coin en "X/USDC") :
+    // gardés pour la vue simple (sens, marge, prix cible, distance). Les triggers TP/SL restent
+    // attachés aux positions via mapHlPositions.
+    openOrders: (orders || [])
+      .filter(o => o && !o.isTrigger && o.coin && !String(o.coin).includes('/'))
+      .map(o => ({
+        oid: o.oid, coin: o.coin, side: o.side === 'B' ? 'long' : 'short',
+        px: hlNum(o.limitPx), sz: hlNum(o.sz), tif: o.tif || '', reduceOnly: !!o.reduceOnly,
+      })),
   };
 }
 
@@ -951,6 +960,8 @@ const defaultState = () => ({
   settings: { theme: 'dark', chartUnit: 'usdc', autoRefresh: true, range: '90J', view: 'live', liveAcct: null, simUnit: 'usdc', simChart: { total: true, accts: {} } },
   chart: { total: true, cash: false, accts: {} },
   btc: { price: null, updatedAt: null },
+  hlMids: {},      // allMids Hyperliquid (dernier fetch) : mark de chaque coin, pour les distances des ordres en attente
+  hlMaxLev: {},    // meta.universe -> maxLeverage par coin : repli de levier pour la marge d'un ordre sans position ouverte
   accounts: [],
   priceHistory: {},
   sims: [],
@@ -1682,9 +1693,13 @@ function journalObserveLive(s, accId, snapshot, nowMs) {
    secours. L'historique (« Reconstruire l'historique ») reste servi par CoinGecko. */
 async function fetchBtcPrice() {
   try {
-    const mids = await hlFetch({ type: 'allMids' });
+    const [mids, meta] = await Promise.all([hlFetch({ type: 'allMids' }), hlFetch({ type: 'meta' })]);
     const p = hlNum(mids && mids.BTC);
-    if (p > 0) return p;
+    if (p > 0) {
+      const maxLev = {};
+      for (const u of ((meta && meta.universe) || [])) if (u && u.name) maxLev[u.name] = u.maxLeverage || 1;
+      return { price: p, mids, maxLev };
+    }
     throw new Error('BTC absent de allMids');
   } catch (e) {
     console.warn('Cours Hyperliquid indisponible, repli CoinGecko :', e);
@@ -1693,7 +1708,7 @@ async function fetchBtcPrice() {
     const d = await r.json();
     const price = d && d.bitcoin && d.bitcoin.usd;
     if (typeof price !== 'number') throw new Error('Réponse inattendue');
-    return price;
+    return { price };
   }
 }
 
@@ -1705,11 +1720,14 @@ function useBtcPrice(state, update, intervalMs = AUTO_REFRESH_MS) {
   const refresh = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const price = await fetchBtcPrice();
+      const r = await fetchBtcPrice();
+      const price = typeof r === 'number' ? r : r.price;
       update(s => {
         s.btc = { price, updatedAt: new Date().toISOString() };
         if (!s.priceHistory) s.priceHistory = {};
         s.priceHistory[todayStr()] = price;
+        if (r && r.mids) s.hlMids = r.mids;
+        if (r && r.maxLev) s.hlMaxLev = r.maxLev;
       });
     } catch (e) {
       setError(e.message || 'Erreur réseau');
@@ -5668,27 +5686,71 @@ function SimplePosRow({ r }) {
 /* Wallets : de quoi se positionner vite — valeur et cash dispo de chaque wallet, dans
    l'ordre de l'app. Grandeurs de STOCK (accAt du jour) : indépendantes du T0, mêmes
    chiffres que les panneaux « Valeur » / « Cash dispo » de la vue complète. */
-function SimpleWallets({ accounts, price }) {
+/* Ordres limites en attente d'un wallet HL, prêts à afficher : marge = sz × prix cible / levier
+   (levier de la position ouverte sur le même coin, sinon maxLeverage du coin via meta),
+   distance au prix cible en % du mark (allMids), triés de la plus proche à la plus lointaine. */
+function simpleOrders(acc, mids, maxLev, btcPrice) {
+  if (acc.source !== 'hyperliquid') return [];
+  const snap = (acc.hl || {}).snapshot || {};
+  const posByCoin = {};
+  for (const p of (snap.positions || [])) posByCoin[p.coin] = p;
+  return (snap.openOrders || []).map(o => {
+    const mark = mids && mids[o.coin] != null ? hlNum(mids[o.coin]) : (o.coin === 'BTC' ? btcPrice : null);
+    const lev = posByCoin[o.coin] && posByCoin[o.coin].leverage ? posByCoin[o.coin].leverage
+      : ((maxLev && maxLev[o.coin]) || 1);
+    const margin = lev > 0 && o.px > 0 ? (o.sz * o.px) / lev : 0;
+    const dist = mark > 0 && o.px > 0 ? (o.side === 'long' ? mark - o.px : o.px - mark) / mark * 100 : null;
+    return { ...o, mark, margin, dist };
+  }).sort((x, y) => (x.dist == null) - (y.dist == null) || (x.dist || 0) - (y.dist || 0));
+}
+
+// Une ligne d'ordre en attente : « En attente · L/S · coin · prix cible », puis marge + distance.
+function SimpleOrdRow({ o }) {
+  return (
+    <div className="simple-ord">
+      <span className="simple-ord-top">
+        <span className="simple-ord-lbl">En attente</span>
+        <Badge tone={o.side} size="sm">{o.side === 'long' ? 'L' : 'S'}</Badge>
+        <span className="simple-pos-coin">{o.coin}</span>
+        <span className="simple-ord-px">{o.px > 0 ? hlPx(o.px) : '—'}</span>
+      </span>
+      <span className="simple-ord-sub">
+        <span className="seg">Marge {numFmt(o.margin, 0)}</span>
+        {o.dist != null && <span className="seg">{o.dist <= 0 ? 'atteint' : 'à ' + distFmt(o.dist)}</span>}
+      </span>
+    </div>
+  );
+}
+
+function SimpleWallets({ accounts, price, mids, maxLev }) {
   const rows = accounts.map(a => {
     const r = accAt(a, todayStr(), price);
     const nPos = a.source === 'hyperliquid' ? ((((a.hl || {}).snapshot || {}).positions) || []).length
       : (a.positions || []).filter(x => x.status === 'open').length;
-    return { acc: a, equity: r.equity, cash: r.cash, margin: r.openMargin, nPos, err: a.source === 'hyperliquid' && !!(a.hl || {}).error };
+    return { acc: a, equity: r.equity, cash: r.cash, margin: r.openMargin, nPos, err: a.source === 'hyperliquid' && !!(a.hl || {}).error,
+      orders: simpleOrders(a, mids, maxLev, price) };
   });
   const tot = rows.reduce((t, r) => ({ equity: t.equity + r.equity, cash: t.cash + r.cash }), { equity: 0, cash: 0 });
   return (
     <div className="simple-wal">
       <div className="simple-wal-row simple-wal-hrow"><span /><span>Valeur</span><span>Cash dispo</span></div>
       {rows.map(r => (
-        <div className="simple-wal-row" key={r.acc.id}>
-          <span className="simple-wal-id">
-            <span className="simple-pos-wallet"><ColorDot color={dsColor(r.acc.color)} size={8} /><span className="simple-wal-name">{r.acc.name}</span>
-              {r.err && <span style={{ color: 'var(--warn)' }} title="Dernière synchro Hyperliquid en échec : chiffres possiblement anciens.">⚠</span>}</span>
-            <span className="simple-pos-sub">{r.nPos === 0 ? 'à plat' : r.nPos + ' position' + (r.nPos > 1 ? 's' : '') + (r.margin > 0 ? ' · marge ' + numFmt(r.margin, 0) : '')}</span>
-          </span>
-          <span className="simple-wal-num">{numFmt(r.equity, 0)}</span>
-          <span className="simple-wal-num simple-wal-cash">{numFmt(r.cash, 0)}</span>
-        </div>
+        <React.Fragment key={r.acc.id}>
+          <div className="simple-wal-row">
+            <span className="simple-wal-id">
+              <span className="simple-pos-wallet"><ColorDot color={dsColor(r.acc.color)} size={8} /><span className="simple-wal-name">{r.acc.name}</span>
+                {r.err && <span style={{ color: 'var(--warn)' }} title="Dernière synchro Hyperliquid en échec : chiffres possiblement anciens.">⚠</span>}</span>
+              <span className="simple-pos-sub">{r.nPos === 0 ? 'à plat' : r.nPos + ' position' + (r.nPos > 1 ? 's' : '') + (r.margin > 0 ? ' · marge ' + numFmt(r.margin, 0) : '')}</span>
+            </span>
+            <span className="simple-wal-num">{numFmt(r.equity, 0)}</span>
+            <span className="simple-wal-num simple-wal-cash">{numFmt(r.cash, 0)}</span>
+          </div>
+          {r.orders.length > 0 && (
+            <div className="simple-ord-list">
+              {r.orders.map(o => <SimpleOrdRow key={o.oid} o={o} />)}
+            </div>
+          )}
+        </React.Fragment>
       ))}
       {rows.length > 1 && (
         <div className="simple-wal-row simple-wal-tot">
@@ -5737,7 +5799,7 @@ function SimpleChart({ history, range, onRange, valTp, valSl }) {
   );
 }
 
-function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onFull }) {
+function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onFull, mids, maxLev }) {
   const now = useNow(5000);
   const fc = useMemo(() => computeForecast(accounts, price), [accounts, price]);
   // Repères du graphe : mêmes formules que la colonne KPI (somme exacte des panneaux).
@@ -5790,7 +5852,7 @@ function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRang
 
       <section className="simple-card">
         <div className="simple-head"><span className="lbl">Wallets</span><span className="muted">{accounts.length}</span></div>
-        <SimpleWallets accounts={accounts} price={price} />
+        <SimpleWallets accounts={accounts} price={price} mids={mids} maxLev={maxLev} />
       </section>
 
       <button className="simple-switch" onClick={onFull}>Vue complète ›</button>
@@ -6179,6 +6241,7 @@ function App() {
           <SimpleView agg={agg} today={today} price={price} btcAt={state.btc.updatedAt} accounts={state.accounts} history={history}
             range={SIMPLE_RANGES.includes(ui.simpleRange) ? ui.simpleRange : '30J'} onRange={(r) => setUi({ simpleRange: r })}
             onRefresh={refreshAll} refreshing={loading}
+            mids={state.hlMids} maxLev={state.hlMaxLev}
             onFull={() => { setForceFull(true); window.scrollTo(0, 0); }} />
         ) : (<>
         {simpleWanted && <button className="simple-back" onClick={() => { setForceFull(false); window.scrollTo(0, 0); }}>‹ Vue simple</button>}

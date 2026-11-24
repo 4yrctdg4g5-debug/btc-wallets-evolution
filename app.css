@@ -575,6 +575,18 @@
 .simple-wal-cash { font-weight: var(--weight-semibold); color: var(--text-primary); }
 .simple-wal-tot { font-size: var(--text-sm); }
 .simple-wal-tot > .simple-wal-num { font-weight: var(--weight-semibold); }
+/* Ordres limites en attente, sous la ligne de leur wallet (indentés sous le nom) */
+.simple-ord-list { display: flex; flex-direction: column; padding-left: 14px; }
+.simple-ord {
+  border-top: 1px solid var(--hairline);
+  display: flex; flex-direction: column; gap: 3px;
+  padding: var(--space-2) 0; color: var(--text-primary);
+}
+.simple-ord:first-child { padding-top: 0; }
+.simple-ord-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.simple-ord-lbl { font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+.simple-ord-px { margin-left: auto; font-size: var(--text-sm); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.simple-ord-sub { display: flex; gap: var(--space-3); font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .simple-switch, .simple-back {
   appearance: none; background: transparent; border: none; cursor: pointer;
   font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-secondary);
