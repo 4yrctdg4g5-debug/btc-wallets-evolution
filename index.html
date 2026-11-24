@@ -5708,10 +5708,12 @@ function simpleOrders(acc, mids, maxLev, btcPrice) {
 function SimpleOrdRow({ o }) {
   return (
     <div className="simple-ord">
-      <span className="simple-ord-lbl">En attente</span>
-      <Badge tone={o.side} size="sm">{o.side === 'long' ? 'L' : 'S'}</Badge>
-      <span className="simple-pos-coin">{o.coin}</span>
-      <span className="simple-ord-sec simple-ord-push">Marge {numFmt(o.margin, 0)}</span>
+      <span className="simple-ord-id">
+        <span className="simple-ord-lbl">En attente</span>
+        <Badge tone={o.side} size="sm">{o.side === 'long' ? 'L' : 'S'}</Badge>
+        <span className="simple-pos-coin">{o.coin}</span>
+      </span>
+      <span className="simple-ord-sec">Marge {numFmt(o.margin, 0)}</span>
       <span className="simple-ord-sec">
         {o.px > 0 ? hlPx(o.px) : '—'}
         {o.dist != null && <>{' · '}{o.dist <= 0 ? 'atteint' : 'à ' + distFmt(o.dist)}</>}

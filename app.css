@@ -577,17 +577,20 @@
 .simple-wal-tot > .simple-wal-num { font-weight: var(--weight-semibold); }
 /* Ordres limites en attente, sous la ligne de leur wallet (indentés sous le nom) */
 .simple-ord-list { display: flex; flex-direction: column; padding-left: 14px; }
+/* Même grille 3 colonnes que les lignes secondaires de la carte 3 (.simple-pos-sub) :
+   identifiant (En attente · L/S · coin) | marge | prix cible + distance */
 .simple-ord {
   border-top: 1px solid var(--hairline);
-  display: flex; align-items: center; gap: 6px; min-width: 0;
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 var(--space-3); align-items: center;
   padding: var(--space-2) 0; color: var(--text-primary);
   font-size: var(--text-sm);
 }
 .simple-ord:first-child { padding-top: 0; }
+.simple-ord-id { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .simple-ord-lbl { font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
-/* Infos secondaires (marge, prix cible, distance) en gris clair, comme les lignes secondaires de la carte 3 (.simple-pos-sub) */
-.simple-ord-sec { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.simple-ord-push { margin-left: auto; }
+/* Infos secondaires (marge, prix cible, distance) en gris clair, comme les lignes secondaires de la carte 3 */
+.simple-ord-sec { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .simple-switch, .simple-back {
   appearance: none; background: transparent; border: none; cursor: pointer;
   font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-secondary);
