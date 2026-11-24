@@ -469,6 +469,9 @@ function mapHlSnapshot(ch, orders, spot) {
     perpEquity, spotUsdc,
     cash: hlNum(ch.withdrawable) + Math.max(0, usdcTotal - usdcHold),
     openMargin: hlNum(ms.totalMarginUsed),
+    // Marge bloquée par les ordres ouverts = accountValue − withdrawable − marge des positions
+    // (totalMarginUsed ne compte que les positions). Sert à inférer le levier effectif du compte.
+    orderMargin: Math.max(0, perpEquity - hlNum(ch.withdrawable) - hlNum(ms.totalMarginUsed)),
     latent: positions.reduce((s, p) => s + p.latent, 0),
     positions,
     // Ordres limites RESTANTS (non-trigger, perp uniquement — le spot a un coin en "X/USDC") :
@@ -5682,20 +5685,25 @@ function SimplePosRow({ r }) {
    chiffres que les panneaux « Valeur » / « Cash dispo » de la vue complète. */
 /* Ordres limites en attente d'un wallet HL, prêts à afficher : distance au prix cible en %
    du mark (allMids), triés de la plus proche à la plus lointaine.
-   Marge réservée = sz × limitPx / levier DU COIN — mais en lecture seule, le levier du
-   compte n'est exposé que par une position ouverte sur le même coin (assetPositions) ;
-   sinon la marge est inconnue (null → « — ») plutôt qu'un chiffre faux. Un ordre
-   reduceOnly ne bloque aucune marge : la position existante la couvre déjà. */
+   Marge réservée = sz × limitPx / levier. En lecture seule, le levier du compte sur un coin
+   n'est exposé que par une position ouverte (assetPositions) ; sinon on l'infère de la marge
+   bloquée par les ordres (snapshot.orderMargin = accountValue − withdrawable − marge positions) :
+   levier effectif = Σ(sz×px des ordres non-reduceOnly) / orderMargin — exact quand un seul
+   levier (le default du compte) s'applique aux ordres d'ouverture. Ordre reduceOnly : aucune
+   marge bloquée (la position la couvre déjà) → null → « — ». */
 function simpleOrders(acc, mids, btcPrice) {
   if (acc.source !== 'hyperliquid') return [];
   const snap = (acc.hl || {}).snapshot || {};
   const posByCoin = {};
   for (const p of (snap.positions || [])) posByCoin[p.coin] = p;
-  return (snap.openOrders || []).map(o => {
+  const list = snap.openOrders || [];
+  const openNotional = list.filter(o => !o.reduceOnly).reduce((s, o) => s + o.sz * o.px, 0);
+  const effLev = openNotional > 0 && snap.orderMargin > 0 ? openNotional / snap.orderMargin : null;
+  return list.map(o => {
     const mark = mids && mids[o.coin] != null ? hlNum(mids[o.coin]) : (o.coin === 'BTC' ? btcPrice : null);
     const pos = posByCoin[o.coin];
-    const margin = (!o.reduceOnly && pos && pos.leverage && o.px > 0 && o.sz > 0)
-      ? (o.sz * o.px) / pos.leverage : null;
+    const lev = pos && pos.leverage ? pos.leverage : effLev;
+    const margin = (!o.reduceOnly && lev && o.px > 0 && o.sz > 0) ? (o.sz * o.px) / lev : null;
     const dist = mark > 0 && o.px > 0 ? (o.side === 'long' ? mark - o.px : o.px - mark) / mark * 100 : null;
     return { ...o, mark, margin, dist };
   }).sort((x, y) => (x.dist == null) - (y.dist == null) || (x.dist || 0) - (y.dist || 0));
