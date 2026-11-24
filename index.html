@@ -961,7 +961,6 @@ const defaultState = () => ({
   chart: { total: true, cash: false, accts: {} },
   btc: { price: null, updatedAt: null },
   hlMids: {},      // allMids Hyperliquid (dernier fetch) : mark de chaque coin, pour les distances des ordres en attente
-  hlMaxLev: {},    // meta.universe -> maxLeverage par coin : repli de levier pour la marge d'un ordre sans position ouverte
   accounts: [],
   priceHistory: {},
   sims: [],
@@ -1693,13 +1692,9 @@ function journalObserveLive(s, accId, snapshot, nowMs) {
    secours. L'historique (« Reconstruire l'historique ») reste servi par CoinGecko. */
 async function fetchBtcPrice() {
   try {
-    const [mids, meta] = await Promise.all([hlFetch({ type: 'allMids' }), hlFetch({ type: 'meta' })]);
+    const mids = await hlFetch({ type: 'allMids' });
     const p = hlNum(mids && mids.BTC);
-    if (p > 0) {
-      const maxLev = {};
-      for (const u of ((meta && meta.universe) || [])) if (u && u.name) maxLev[u.name] = u.maxLeverage || 1;
-      return { price: p, mids, maxLev };
-    }
+    if (p > 0) return { price: p, mids };
     throw new Error('BTC absent de allMids');
   } catch (e) {
     console.warn('Cours Hyperliquid indisponible, repli CoinGecko :', e);
@@ -1727,7 +1722,6 @@ function useBtcPrice(state, update, intervalMs = AUTO_REFRESH_MS) {
         if (!s.priceHistory) s.priceHistory = {};
         s.priceHistory[todayStr()] = price;
         if (r && r.mids) s.hlMids = r.mids;
-        if (r && r.maxLev) s.hlMaxLev = r.maxLev;
       });
     } catch (e) {
       setError(e.message || 'Erreur réseau');
@@ -5686,19 +5680,22 @@ function SimplePosRow({ r }) {
 /* Wallets : de quoi se positionner vite — valeur et cash dispo de chaque wallet, dans
    l'ordre de l'app. Grandeurs de STOCK (accAt du jour) : indépendantes du T0, mêmes
    chiffres que les panneaux « Valeur » / « Cash dispo » de la vue complète. */
-/* Ordres limites en attente d'un wallet HL, prêts à afficher : marge = sz × prix cible / levier
-   (levier de la position ouverte sur le même coin, sinon maxLeverage du coin via meta),
-   distance au prix cible en % du mark (allMids), triés de la plus proche à la plus lointaine. */
-function simpleOrders(acc, mids, maxLev, btcPrice) {
+/* Ordres limites en attente d'un wallet HL, prêts à afficher : distance au prix cible en %
+   du mark (allMids), triés de la plus proche à la plus lointaine.
+   Marge réservée = sz × limitPx / levier DU COIN — mais en lecture seule, le levier du
+   compte n'est exposé que par une position ouverte sur le même coin (assetPositions) ;
+   sinon la marge est inconnue (null → « — ») plutôt qu'un chiffre faux. Un ordre
+   reduceOnly ne bloque aucune marge : la position existante la couvre déjà. */
+function simpleOrders(acc, mids, btcPrice) {
   if (acc.source !== 'hyperliquid') return [];
   const snap = (acc.hl || {}).snapshot || {};
   const posByCoin = {};
   for (const p of (snap.positions || [])) posByCoin[p.coin] = p;
   return (snap.openOrders || []).map(o => {
     const mark = mids && mids[o.coin] != null ? hlNum(mids[o.coin]) : (o.coin === 'BTC' ? btcPrice : null);
-    const lev = posByCoin[o.coin] && posByCoin[o.coin].leverage ? posByCoin[o.coin].leverage
-      : ((maxLev && maxLev[o.coin]) || 1);
-    const margin = lev > 0 && o.px > 0 ? (o.sz * o.px) / lev : 0;
+    const pos = posByCoin[o.coin];
+    const margin = (!o.reduceOnly && pos && pos.leverage && o.px > 0 && o.sz > 0)
+      ? (o.sz * o.px) / pos.leverage : null;
     const dist = mark > 0 && o.px > 0 ? (o.side === 'long' ? mark - o.px : o.px - mark) / mark * 100 : null;
     return { ...o, mark, margin, dist };
   }).sort((x, y) => (x.dist == null) - (y.dist == null) || (x.dist || 0) - (y.dist || 0));
@@ -5713,7 +5710,7 @@ function SimpleOrdRow({ o }) {
         <Badge tone={o.side} size="sm">{o.side === 'long' ? 'L' : 'S'}</Badge>
         <span className="simple-pos-coin">{o.coin}</span>
       </span>
-      <span className="simple-ord-sec">Marge {numFmt(o.margin, 0)}</span>
+      <span className="simple-ord-sec">{o.margin != null ? 'Marge ' + numFmt(o.margin, 0) : '—'}</span>
       <span className="simple-ord-sec">
         {o.px > 0 ? hlPx(o.px) : '—'}
         {o.dist != null && <>{' · '}{o.dist <= 0 ? 'atteint' : 'à ' + distFmt(o.dist)}</>}
@@ -5722,13 +5719,13 @@ function SimpleOrdRow({ o }) {
   );
 }
 
-function SimpleWallets({ accounts, price, mids, maxLev }) {
+function SimpleWallets({ accounts, price, mids }) {
   const rows = accounts.map(a => {
     const r = accAt(a, todayStr(), price);
     const nPos = a.source === 'hyperliquid' ? ((((a.hl || {}).snapshot || {}).positions) || []).length
       : (a.positions || []).filter(x => x.status === 'open').length;
     return { acc: a, equity: r.equity, cash: r.cash, margin: r.openMargin, nPos, err: a.source === 'hyperliquid' && !!(a.hl || {}).error,
-      orders: simpleOrders(a, mids, maxLev, price) };
+      orders: simpleOrders(a, mids, price) };
   });
   const tot = rows.reduce((t, r) => ({ equity: t.equity + r.equity, cash: t.cash + r.cash }), { equity: 0, cash: 0 });
   return (
@@ -5799,7 +5796,7 @@ function SimpleChart({ history, range, onRange, valTp, valSl }) {
   );
 }
 
-function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onFull, mids, maxLev }) {
+function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRange, onRefresh, refreshing, onFull, mids }) {
   const now = useNow(5000);
   const fc = useMemo(() => computeForecast(accounts, price), [accounts, price]);
   // Repères du graphe : mêmes formules que la colonne KPI (somme exacte des panneaux).
@@ -5852,7 +5849,7 @@ function SimpleView({ agg, today, price, btcAt, accounts, history, range, onRang
 
       <section className="simple-card">
         <div className="simple-head"><span className="lbl">Wallets</span><span className="muted">{accounts.length}</span></div>
-        <SimpleWallets accounts={accounts} price={price} mids={mids} maxLev={maxLev} />
+        <SimpleWallets accounts={accounts} price={price} mids={mids} />
       </section>
 
       <button className="simple-switch" onClick={onFull}>Vue complète ›</button>
@@ -6241,7 +6238,7 @@ function App() {
           <SimpleView agg={agg} today={today} price={price} btcAt={state.btc.updatedAt} accounts={state.accounts} history={history}
             range={SIMPLE_RANGES.includes(ui.simpleRange) ? ui.simpleRange : '30J'} onRange={(r) => setUi({ simpleRange: r })}
             onRefresh={refreshAll} refreshing={loading}
-            mids={state.hlMids} maxLev={state.hlMaxLev}
+            mids={state.hlMids}
             onFull={() => { setForceFull(true); window.scrollTo(0, 0); }} />
         ) : (<>
         {simpleWanted && <button className="simple-back" onClick={() => { setForceFull(false); window.scrollTo(0, 0); }}>‹ Vue simple</button>}
