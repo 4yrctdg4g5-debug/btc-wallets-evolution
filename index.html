@@ -5714,7 +5714,6 @@ function SimpleOrdRow({ o, color }) {
   return (
     <div className="simple-ord">
       <span className="simple-ord-id">
-        <span className="simple-ord-lbl">En attente</span>
         <Badge tone={o.side} size="sm">{o.side === 'long' ? 'L' : 'S'}</Badge>
         {o.lev != null && <LeverageBadge value={Math.round(o.lev)} size="sm" color={idVar(color)} />}
         <span className="simple-pos-coin">{o.coin}</span>
@@ -5746,7 +5745,9 @@ function SimpleWallets({ accounts, price, mids }) {
             <span className="simple-wal-id">
               <span className="simple-pos-wallet"><ColorDot color={dsColor(r.acc.color)} size={8} /><span className="simple-wal-name">{r.acc.name}</span>
                 {r.err && <span style={{ color: 'var(--warn)' }} title="Dernière synchro Hyperliquid en échec : chiffres possiblement anciens.">⚠</span>}</span>
-              <span className="simple-pos-sub">{r.nPos === 0 ? 'à plat' : r.nPos + ' position' + (r.nPos > 1 ? 's' : '') + (r.margin > 0 ? ' · marge ' + numFmt(r.margin, 0) : '')}</span>
+              <span className="simple-pos-sub">{r.nPos === 0
+                ? (r.orders.length > 0 ? 'En attente' : 'à plat')
+                : r.nPos + ' position' + (r.nPos > 1 ? 's' : '') + (r.margin > 0 ? ' · marge ' + numFmt(r.margin, 0) : '') + (r.orders.length > 0 ? ' · en attente' : '')}</span>
             </span>
             <span className="simple-wal-num">{numFmt(r.equity, 0)}</span>
             <span className="simple-wal-num simple-wal-cash">{numFmt(r.cash, 0)}</span>
