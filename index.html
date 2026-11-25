@@ -5705,17 +5705,18 @@ function simpleOrders(acc, mids, btcPrice) {
     const lev = pos && pos.leverage ? pos.leverage : effLev;
     const margin = (!o.reduceOnly && lev && o.px > 0 && o.sz > 0) ? (o.sz * o.px) / lev : null;
     const dist = mark > 0 && o.px > 0 ? (o.side === 'long' ? mark - o.px : o.px - mark) / mark * 100 : null;
-    return { ...o, mark, margin, dist };
+    return { ...o, mark, margin, dist, lev };
   }).sort((x, y) => (x.dist == null) - (y.dist == null) || (x.dist || 0) - (y.dist || 0));
 }
 
 // Une ligne d'ordre en attente : « En attente · L/S · coin · prix cible », puis marge + distance.
-function SimpleOrdRow({ o }) {
+function SimpleOrdRow({ o, color }) {
   return (
     <div className="simple-ord">
       <span className="simple-ord-id">
         <span className="simple-ord-lbl">En attente</span>
         <Badge tone={o.side} size="sm">{o.side === 'long' ? 'L' : 'S'}</Badge>
+        {o.lev != null && <LeverageBadge value={Math.round(o.lev)} size="sm" color={idVar(color)} />}
         <span className="simple-pos-coin">{o.coin}</span>
       </span>
       <span className="simple-ord-sec">{o.margin != null ? 'Marge ' + numFmt(o.margin, 0) : '—'}</span>
@@ -5752,7 +5753,7 @@ function SimpleWallets({ accounts, price, mids }) {
           </div>
           {r.orders.length > 0 && (
             <div className="simple-ord-list">
-              {r.orders.map(o => <SimpleOrdRow key={o.oid} o={o} />)}
+              {r.orders.map(o => <SimpleOrdRow key={o.oid} o={o} color={dsColor(r.acc.color)} />)}
             </div>
           )}
         </React.Fragment>
