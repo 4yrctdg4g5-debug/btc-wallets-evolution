@@ -5663,7 +5663,8 @@ function SimplePosRow({ r }) {
       </span>
       <span className="simple-pos-sub">
         <span>
-          <span className="seg">Entrée @ {r.entry > 0 ? hlPx(r.entry) : '—'}</span>
+          <span className="seg">Entrée</span>{' '}
+          <span className="seg">@ {r.entry > 0 ? hlPx(r.entry) : '—'}</span>
         </span>
         <span>
           <span className="seg">TP {r.tp > 0 ? hlPx(r.tp) : '—'}</span>
@@ -5718,10 +5719,10 @@ function SimpleOrdRow({ o, color }) {
         {o.lev != null && <LeverageBadge value={Math.round(o.lev)} size="sm" color={idVar(color)} />}
         <span className="simple-pos-coin">{o.coin}</span>
       </span>
-      <span className="simple-ord-sec">{o.margin != null ? 'Marge ' + numFmt(o.margin, 0) : '—'}</span>
+      <span className="simple-ord-sec"><span className="seg">{o.margin != null ? 'Marge ' + numFmt(o.margin, 0) : '—'}</span></span>
       <span className="simple-ord-sec">
-        {o.px > 0 ? '@ ' + hlPx(o.px) : '—'}
-        {o.dist != null && <>{' · '}{o.dist <= 0 ? 'atteint' : 'à ' + distFmt(o.dist)}</>}
+        <span className="seg">{o.px > 0 ? '@ ' + hlPx(o.px) : '—'}</span>
+        {o.dist != null && <>{' · '}<span className="seg">{o.dist <= 0 ? 'atteint' : 'à ' + distFmt(o.dist)}</span></>}
       </span>
     </div>
   );

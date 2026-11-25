@@ -589,7 +589,8 @@
 .simple-ord:first-child { padding-top: 0; }
 .simple-ord-id { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 /* Infos secondaires (marge, prix cible, distance) en gris clair, comme les lignes secondaires de la carte 3 */
-.simple-ord-sec { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Repli autorisé entre les .seg, jamais dans un montant (pas d'ellipsis : rien ne disparaît) */
+.simple-ord-sec { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 0; }
 .simple-switch, .simple-back {
   appearance: none; background: transparent; border: none; cursor: pointer;
   font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-secondary);
@@ -660,6 +661,12 @@
   /* Vue simple : cartes plus serrées pour tout voir sans (presque) défiler */
   .simple { gap: var(--space-2); }
   .simple-card { padding: var(--space-3); }
+
+  /* Lignes secondaires des cartes 3 (positions) et 4 (ordres en attente) : 3 colonnes
+     compactées (gap réduit, police 2xs) pour tenir sur une ligne ; si ça ne tient pas,
+     le repli se fait entre les .seg, jamais à l'intérieur d'un montant. */
+  .simple-pos-sub, .simple-ord { gap: 0 var(--space-2); }
+  .simple-pos-sub, .simple-ord-sec { font-size: var(--text-2xs); }
 }
 /* Très petit écran : monogramme seul */
 @media (max-width: 480px) {
