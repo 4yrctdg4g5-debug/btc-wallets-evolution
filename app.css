@@ -582,8 +582,8 @@
 .simple-ord-list { display: flex; flex-direction: column; padding-left: 14px; }
 /* Même ligne flex que les lignes secondaires de la carte 3 (.simple-pos-sub) :
    L/S · levier · coin | marge | prix cible + distance, cellules en largeur naturelle réparties */
+/* Pas de filet entre les ordres d'un même wallet : seuls les wallets sont séparés (.simple-wal-row) */
 .simple-ord {
-  border-top: 1px solid var(--hairline);
   display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
   gap: 0 var(--space-3);
   padding: var(--space-2) 0; color: var(--text-primary);
